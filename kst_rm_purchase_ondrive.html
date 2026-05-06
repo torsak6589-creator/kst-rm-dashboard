@@ -220,7 +220,7 @@ tr:hover td{background:rgba(200,152,42,.04)}
   <div class="auth-logo">KST</div>
   <div class="auth-title">📦 RM Purchase Summary Dashboard</div>
   <div class="auth-sub">เชื่อมต่อ Microsoft 365 เพื่อดึงข้อมูลวัตถุดิบ<br>จาก OneDrive (ADD 5.xlsx → Sheet RM RECORD)</div>
-  <div style="font-size:10px;color:#3A4E68;margin-top:-10px">v6 — Native PKCE</div>
+  <div style="font-size:10px;color:#3A4E68;margin-top:-10px">v7 — Hardcoded URI</div>
   <button class="btn-login" onclick="signIn()" id="btnLogin">
     <div class="ms-icon"></div>
     Sign in with Microsoft 365
@@ -400,9 +400,9 @@ async function _sha256B64url(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 }
-function _redirectUri() {
-  return window.location.href.split('?')[0].split('#')[0];
-}
+/* Hardcoded — ต้องตรงกับ Azure AD Redirect URI ทุก character */
+const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_purchase_ondrive.html';
+function _redirectUri() { return REDIRECT_URI; }
 
 /* ════════════════════════════════════
    SIGN IN — redirect to Microsoft
@@ -754,6 +754,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   /* ── Always show something immediately ── */
   setAuthStatus('⏳ กำลังเตรียมระบบ...');
   console.log('[KST v6] DOMContentLoaded fired');
+  console.log('[KST v6] Redirect URI:', REDIRECT_URI);
 
   try {
     /* 1. Handle auth callback (?code=...) */
@@ -779,7 +780,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ── Version banner in console ── */
-console.log('%c KST RM Dashboard v6 — Native PKCE (No MSAL) ', 'background:#C8982A;color:#0D1B2E;font-weight:bold;padding:4px 8px;border-radius:4px');
+console.log('%c KST RM Dashboard v7 — Hardcoded URI (No MSAL) ', 'background:#C8982A;color:#0D1B2E;font-weight:bold;padding:4px 8px;border-radius:4px');
 </script>
 <style>
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
