@@ -207,13 +207,13 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <!-- FILTER -->
 <div class="filterbar">
   <span class="fl">📅 จาก:</span>
-  <input type="date" id="fFrom">
+  <input type="date" id="fFrom" onchange="applyFilter()">
   <span class="fl">ถึง:</span>
-  <input type="date" id="fTo">
+  <input type="date" id="fTo" onchange="applyFilter()">
   <span class="fl">| RM:</span>
-  <select id="fType"><option value="all">ทั้งหมด</option><option value="กุ้งเป็น">กุ้งเป็น</option><option value="กุ้งดอง">กุ้งดอง</option></select>
+  <select id="fType" onchange="applyFilter()"><option value="all">ทั้งหมด</option></select>
   <span class="fl">| ชนิด:</span>
-  <select id="fSpecies"><option value="all">ทั้งหมด</option><option value="กุ้งขาว">กุ้งขาว</option><option value="กุลาดำ">กุลาดำ</option></select>
+  <select id="fSpecies" onchange="applyFilter()"><option value="all">ทั้งหมด</option></select>
   <button class="btn-primary" onclick="applyFilter()">🔍 Apply</button>
   <button class="btn-sec" onclick="resetFilter()">↺ Reset</button>
   <button class="btn-refresh" onclick="refreshAll()">🔄 Refresh</button>
@@ -489,6 +489,7 @@ async function loadAll(){
       document.getElementById('fFrom').value=_fmt(from);
       document.getElementById('fTo').value=_fmt(latest);
     }
+    buildDropdowns();
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
     setFS('✅ โหลดสำเร็จ — RM: '+rawRM.length.toLocaleString()+' | แผน: '+planData.length+' | KPI: '+actualData.length+' | '+_ts());
@@ -504,13 +505,28 @@ async function loadAll(){
 }
 
 /* ══════ FILTER ══════ */
+/* ── Build dropdown options from actual data ── */
+function buildDropdowns(){
+  const types   = [...new Set(rawRM.map(r=>r.typeRM).filter(Boolean))].sort();
+  const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
+  const tyEl = document.getElementById('fType');
+  const spEl = document.getElementById('fSpecies');
+  const curTy = tyEl.value, curSp = spEl.value;
+  tyEl.innerHTML = '<option value="all">ทั้งหมด</option>' +
+    types.map(t=>`<option value="${t}">${t}</option>`).join('');
+  spEl.innerHTML = '<option value="all">ทั้งหมด</option>' +
+    species.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(curTy) tyEl.value = curTy;
+  if(curSp) spEl.value = curSp;
+}
+
 function applyFilter(){
   const fr=document.getElementById('fFrom').value,to=document.getElementById('fTo').value;
   const ty=document.getElementById('fType').value,sp=document.getElementById('fSpecies').value;
   filteredRM=rawRM.filter(r=>{
     if(fr&&r.date<fr)return false;if(to&&r.date>to)return false;
-    if(ty!=='all'&&!r.typeRM.includes(ty))return false;
-    if(sp!=='all'&&!r.species.includes(sp))return false;
+    if(ty!=='all'&&r.typeRM!==ty)return false;
+    if(sp!=='all'&&r.species!==sp)return false;
     return true;
   });
   const f2=d=>d?new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}):'?';
@@ -669,7 +685,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       hideAuth();
       document.getElementById('userLabel').textContent=sessionStorage.getItem('kst_user')||'';
       await loadAll();
-      setInterval(loadAll,1800000);
+      setInterval(loadAll,120000);
       return;
     }
     if(!handled)setAS('พร้อม — กด Sign in เพื่อเข้าสู่ระบบ');
