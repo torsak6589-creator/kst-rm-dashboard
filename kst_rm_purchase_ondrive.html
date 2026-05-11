@@ -559,7 +559,7 @@ function _typeDonut(){
   const L=Object.keys(t),D=L.map(k=>t[k]),tot=D.reduce((s,v)=>s+v,0);
   const C=['rgba(200,152,42,.85)','rgba(0,188,212,.8)'];
   _rb('cType','type',{type:'doughnut',data:{labels:L,datasets:[{data:D,backgroundColor:C,borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${_fK(ctx.parsed)} กก. (${tot?(ctx.parsed/tot*100).toFixed(1):0}%)`}}}}});
-  document.getElementById('typeLegs').innerHTML=L.map((l,i)=>`<div style="display:flex;align-items:center;gap:4px;font-size:9px"><span style="width:7px;height:7px;border-radius:50%;background:${C[i]};display:inline-block"></span>${l} <b style="color:var(--text)">${tot?(t[l]/tot*100).toFixed(1):0}%</b></div>`).join('');
+  document.getElementById('typeLegs').innerHTML=L.map((l,i)=>`<div style="display:flex;align-items:center;gap:4px;font-size:9px"><span style="width:7px;height:7px;border-radius:50%;background:${C[i]};display:inline-block"><\/span>${l} <b style="color:var(--text)">${tot?(t[l]/tot*100).toFixed(1):0}%<\/b><\/div>`).join('');
 }
 function _priceChart(){
   const m={};filteredRM.forEach(r=>{if(!r.price||!r.date)return;const k=r.typeRM.includes('เป็น')?'l':'d';if(!m[r.date])m[r.date]={l:[],d:[]};m[r.date][k].push(r.price);});
@@ -579,7 +579,7 @@ function _supTable(){
     const rk=i+1,pct=(tot?(d.vol/tot*100).toFixed(1):'0'),avgP=(d.p.length?d.p.reduce((a,b)=>a+b,0)/d.p.length:0);
     const bw=Math.min(Math.round(d.vol/maxV*80),80),mt=[...d.ty].find(t=>t.includes('เป็น'))||[...d.ty][0]||'—';
     const tc=mt.includes('เป็น')?'tg':'tb';
-    return `<tr><td><b>${rk}</b></td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}</td><td><span class="tag ${tc}">${mt}</span></td><td>${d.vol.toLocaleString()}</td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#C8982A,#E5B84A)"></div>${pct}%</div></td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}</td><td>${_fM(d.val)}</td><td>${d.n}</td></tr>`;
+    return `<tr><td><b>${rk}<\/b><\/td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}<\/td><td><span class="tag ${tc}">${mt}<\/span><\/td><td>${d.vol.toLocaleString()}<\/td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#C8982A,#E5B84A)"><\/div>${pct}%<\/div><\/td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}<\/td><td>${_fM(d.val)}<\/td><td>${d.n}<\/td><\/tr>`;
   }).join('');
 }
 
@@ -602,7 +602,7 @@ function _renderTab2(){
   // Table
   document.getElementById('planBody').innerHTML=pf.slice(0,50).map(r=>{
     const tc=r[4].includes('เป็น')?'tg':'tb',sc=r[6]&&r[6].includes('ขาว')?'tn':'ta';
-    return `<tr><td style="color:var(--muted)">${r[0]}</td><td title="${r[1]}">${r[1].length>20?r[1].slice(0,19)+'…':r[1]}</td><td><span class="tag ${tc}">${r[4]}</span></td><td><span class="tag ${sc}">${r[6]||'—'}</span></td><td style="text-align:right">${r[3]||'—'}</td><td style="text-align:right">${r[2].toLocaleString()}</td><td style="text-align:right">${r[5]?'฿ '+r[5].toFixed(0):'—'}</td><td style="text-align:right;color:var(--gold-lt)">${_fM(r[2]*r[5])}</td></tr>`;
+    return `<tr><td style="color:var(--muted)">${r[0]}<\/td><td title="${r[1]}">${r[1].length>20?r[1].slice(0,19)+'…':r[1]}<\/td><td><span class="tag ${tc}">${r[4]}<\/span><\/td><td><span class="tag ${sc}">${r[6]||'—'}<\/span><\/td><td style="text-align:right">${r[3]||'—'}<\/td><td style="text-align:right">${r[2].toLocaleString()}<\/td><td style="text-align:right">${r[5]?'฿ '+r[5].toFixed(0):'—'}<\/td><td style="text-align:right;color:var(--gold-lt)">${_fM(r[2]*r[5])}<\/td><\/tr>`;
   }).join('');
 }
 
@@ -630,7 +630,7 @@ function _renderTab3(){
   document.getElementById('actBody').innerHTML=actRows.map(d=>{
     const kpi=d.kpiPct,badge=kpi>=100?'kb-green':kpi>=70?'kb-amber':'kb-red';
     const tc=d.type.includes('จับเป็น')?'tg':'tb';
-    return `<tr><td>${d.month}</td><td><span class="tag ${tc}">${d.type}</span></td><td>${d.planVol.toLocaleString()}</td><td>${d.actVol.toLocaleString()}</td><td>${_fM(d.actVal)}</td><td>${d.avgPrice?'฿ '+d.avgPrice.toFixed(0):'—'}</td><td><span class="kpi-badge ${badge}">${kpi}%</span></td><td><span class="tag ${badge}">${kpi>=100?'✓ เกินแผน':kpi>=70?'~ ใกล้เคียง':'✗ ต่ำกว่าแผน'}</span></td></tr>`;
+    return `<tr><td>${d.month}<\/td><td><span class="tag ${tc}">${d.type}<\/span><\/td><td>${d.planVol.toLocaleString()}<\/td><td>${d.actVol.toLocaleString()}<\/td><td>${_fM(d.actVal)}<\/td><td>${d.avgPrice?'฿ '+d.avgPrice.toFixed(0):'—'}<\/td><td><span class="kpi-badge ${badge}">${kpi}%<\/span><\/td><td><span class="tag ${badge}">${kpi>=100?'✓ เกินแผน':kpi>=70?'~ ใกล้เคียง':'✗ ต่ำกว่าแผน'}<\/span><\/td><\/tr>`;
   }).join('');
 }
 
@@ -655,7 +655,7 @@ const setAS=m=>document.getElementById('authStatus').textContent=m;
 const hideAuth=()=>document.getElementById('authScreen').style.display='none';
 
 // Hidden div to show dash content on successful auth
-document.body.insertAdjacentHTML('beforeend','<div id="dashContent2" style="display:none"></div>');
+document.body.insertAdjacentHTML('beforeend','<div id="dashContent2" style="display:none"><\/div>');
 
 Chart.defaults.color='#7A8CA3';
 Chart.defaults.font.family="'Space Grotesk','Noto Sans Thai',sans-serif";
