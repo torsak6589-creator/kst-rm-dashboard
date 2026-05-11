@@ -1,9 +1,4 @@
-/* ════════════════════════════════════════
-   KST RM — Service Worker v13
-   Updated: cache bust for syntax fix
-   ════════════════════════════════════════ */
-
-const CACHE_NAME = 'kst-rm-v13';  // ← เพิ่มเลข version ทุกครั้งที่ update
+const CACHE_NAME = 'kst-rm-v16';
 const STATIC_ASSETS = [
   './kst_rm_purchase_ondrive.html',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
@@ -12,7 +7,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
+      .then(c => c.addAll(STATIC_ASSETS).catch(()=>{}))
       .then(() => self.skipWaiting())
   );
 });
@@ -20,10 +15,12 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
-        console.log('[KST SW] Deleting old cache:', k);
-        return caches.delete(k);
-      })))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log('[KST SW v16] Deleting old cache:', k);
+          return caches.delete(k);
+        })
+      ))
       .then(() => self.clients.claim())
   );
 });
@@ -31,19 +28,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.hostname.includes('microsoftonline.com') ||
-      url.hostname.includes('graph.microsoft.com')) return;
+      url.hostname.includes('graph.microsoft.com') ||
+      url.hostname.includes('sharepoint.com')) return;
 
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      return fetch(e.request)
-        .then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-          }
-          return res;
-        })
-        .catch(() => cached || caches.match('./kst_rm_purchase_ondrive.html'));
-    })
+    fetch(e.request)
+      .then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request)
+        .then(cached => cached || caches.match('./kst_rm_purchase_ondrive.html')))
   );
 });
