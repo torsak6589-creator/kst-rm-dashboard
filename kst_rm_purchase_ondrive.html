@@ -598,7 +598,7 @@ function _renderTab2(){
   const tp={};pf.forEach(r=>{const k=r[4]||'อื่นๆ';tp[k]=(tp[k]||0)+r[2];});
   const Ltp=Object.keys(tp),Dtp=Ltp.map(k=>tp[k]);
   const COLS=['rgba(200,152,42,.85)','rgba(0,188,212,.8)','rgba(0,200,151,.7)','rgba(255,184,0,.7)'];
-  _rb('cPlanType','planType',{type:'doughnut',data:{labels:Ltp,datasets:[{data:Dtp,backgroundColor:COLS.slice(0,Ltp.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:9},color:'#7A8CA3'}}}}}});
+  _rb('cPlanType','planType',{type:'doughnut',data:{labels:Ltp,datasets:[{data:Dtp,backgroundColor:COLS.slice(0,Ltp.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:9},color:'#7A8CA3'}}}}});
   // Table
   document.getElementById('planBody').innerHTML=pf.slice(0,50).map(r=>{
     const tc=r[4].includes('เป็น')?'tg':'tb',sc=r[6]&&r[6].includes('ขาว')?'tn':'ta';
