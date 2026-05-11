@@ -685,7 +685,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       hideAuth();
       document.getElementById('userLabel').textContent=sessionStorage.getItem('kst_user')||'';
       await loadAll();
-      setInterval(loadAll,120000);
+      setInterval(loadAll,1800000);
       return;
     }
     if(!handled)setAS('พร้อม — กด Sign in เพื่อเข้าสู่ระบบ');
