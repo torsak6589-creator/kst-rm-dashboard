@@ -211,7 +211,17 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <span class="fl">ถึง:</span>
   <input type="date" id="fTo" onchange="applyFilter()">
   <span class="fl">| RM:</span>
-  <select id="fType" onchange="applyFilter()"><option value="all">ทั้งหมด</option></select>
+  <select id="fType" onchange="applyFilter()">
+    <option value="all">ทั้งหมด</option>
+    <optgroup label="── กุ้งเป็น ──">
+      <option value="กุ้งเป็นต้ม">กุ้งเป็นต้ม</option>
+      <option value="กุ้งเป็นดิบ">กุ้งเป็นดิบ</option>
+    </optgroup>
+    <optgroup label="── กุ้งดอง ──">
+      <option value="BROKER กุ้งดอง">BROKER กุ้งดอง</option>
+      <option value="กุ้งดอง(ทะเล)">กุ้งดอง(ทะเล)</option>
+    </optgroup>
+  </select>
   <span class="fl">| ชนิด:</span>
   <select id="fSpecies" onchange="applyFilter()"><option value="all">ทั้งหมด</option></select>
   <button class="btn-primary" onclick="applyFilter()">🔍 Apply</button>
@@ -457,7 +467,7 @@ function _parseRM(r){
     if(isNaN(d))d=null;else{const y=d.getFullYear(),mo=d.getMonth()+1,dy=d.getDate();d=y+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');}}
   const w=_n(_g(r,COL.weight)),p=_n(_g(r,COL.price));
   return{date:d,supplier:String(_g(r,COL.supplier)||'').trim(),weight:w,price:p,
-    size:_n(_g(r,COL.size)),typeRM:String(_g(r,COL.typeRM)||'').trim(),
+    size:_n(_g(r,COL.size)),typeRM:_normalizeType(String(_g(r,COL.typeRM)||'')),
     province:String(_g(r,COL.province)||'').trim(),mortality:_n(_g(r,COL.mortality)),
     species:String(_g(r,COL.species)||'').trim(),value:w*p};
 }
@@ -552,13 +562,23 @@ function buildDropdowns(){
   if(curSp) spEl.value = curSp;
 }
 
-/* ── Helper: match type/species across all tabs ── */
+/* ── Helper: match type/species across all tabs ──
+   Handles typo: 'กุุ้งเป็นดิบ' (double ุ) = 'กุ้งเป็นดิบ'
+── */
+function _normalizeType(str) {
+  // Fix double ุ typo in data
+  return (str || '').replace(/กุุ้ง/g, 'กุ้ง').trim();
+}
 function _matchType(str, filter) {
-  if (filter === 'all') return true;
-  const s = str.toLowerCase();
-  if (filter.includes('เป็น')) return s.includes('เป็น');
-  if (filter.includes('ดอง')) return s.includes('ดอง') || s.includes('broker');
-  return s.includes(filter.toLowerCase());
+  if (!filter || filter === 'all') return true;
+  const norm = _normalizeType(str);
+  const f    = _normalizeType(filter);
+  // Exact match after normalization
+  if (norm === f) return true;
+  // Broad group fallback (ใช้สำหรับ Tab3 ที่อาจมี type ต่างรูปแบบ)
+  if (f === 'กุ้งเป็น') return norm.includes('เป็น');
+  if (f === 'กุ้งดอง')  return norm.includes('ดอง') || norm.toLowerCase().includes('broker');
+  return false;
 }
 function _matchSpecies(str, filter) {
   if (filter === 'all') return true;
@@ -755,7 +775,7 @@ function _renderTab2(fr,to,ty,sp){
   const pf=planData.filter(r=>{
     if(fr&&r[0]<fr)return false;
     if(to&&r[0]>to)return false;
-    if(!_matchType(r[4]||'',ty))return false;   // r[4] = typeRM
+    if(!_matchType(_normalizeType(r[4]||''),ty))return false; // r[4] = typeRM
     if(!_matchSpecies(r[6]||'',sp))return false; // r[6] = species
     return true;
   });
