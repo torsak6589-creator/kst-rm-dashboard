@@ -443,26 +443,37 @@ async function graphGet(path){
 }
 async function fetchSheet(cfg,sheet){
   const enc=encodeURIComponent(sheet);
-  /* Strategy:
-     1. Sharing Token (works for ALL org users) — try first
-     2. Direct Drive access (owner only) — fallback
-  */
+  const errors=[];
+
+  /* ── Strategy 1: Workbook API ผ่าน Sharing Token โดยตรง
+       ใช้ /shares/{token}/driveItem/workbook/...
+       ทำงานได้กับ ทุก user ในองค์กรที่ได้รับ Share
+  ── */
   if(cfg.sharingToken){
     try{
-      const item=await graphGet('/shares/'+cfg.sharingToken+'/driveItem?$select=id,parentReference');
-      const dId=item.parentReference?.driveId||item.parentReference?.siteId, iId=item.id;
-      if(dId&&iId){
-        const r=await graphGet('/drives/'+dId+'/items/'+iId+'/workbook/worksheets/'+enc+'/usedRange?$select=values');
-        console.log('[KST] Sharing token OK:', sheet, 'rows:', (r.values||[]).length);
-        return r.values||[];
-      }
+      const path='/shares/'+cfg.sharingToken+
+                 '/driveItem/workbook/worksheets/'+enc+'/usedRange?$select=values';
+      const r=await graphGet(path);
+      console.log('[KST] ✅ Sharing token direct workbook OK:', sheet, (r.values||[]).length,'rows');
+      return r.values||[];
     }catch(e){
-      console.warn('[KST] Sharing token failed, trying direct:', e.message);
+      errors.push('sharingToken: '+e.message);
+      console.warn('[KST] Sharing token workbook failed:', e.message);
     }
   }
-  /* Fallback: direct drive access (owner only) */
-  const r=await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+'/workbook/worksheets/'+enc+'/usedRange?$select=values');
-  return r.values||[];
+
+  /* ── Strategy 2: Direct drive (owner only) ── */
+  try{
+    const r=await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
+                           '/workbook/worksheets/'+enc+'/usedRange?$select=values');
+    console.log('[KST] ✅ Direct drive OK:', sheet);
+    return r.values||[];
+  }catch(e){
+    errors.push('direct: '+e.message);
+    console.warn('[KST] Direct drive failed:', e.message);
+  }
+
+  throw new Error('ทุก method ล้มเหลว: '+errors.join(' | '));
 }
 
 /* ══════ DATA STATE ══════ */
