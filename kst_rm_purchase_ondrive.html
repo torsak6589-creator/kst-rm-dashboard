@@ -520,18 +520,32 @@ function buildDropdowns(){
   if(curSp) spEl.value = curSp;
 }
 
+/* ── Helper: match type/species across all tabs ── */
+function _matchType(str, filter) {
+  if (filter === 'all') return true;
+  const s = str.toLowerCase();
+  if (filter.includes('เป็น')) return s.includes('เป็น');
+  if (filter.includes('ดอง')) return s.includes('ดอง') || s.includes('broker');
+  return s.includes(filter.toLowerCase());
+}
+function _matchSpecies(str, filter) {
+  if (filter === 'all') return true;
+  return str.toLowerCase().includes(filter.toLowerCase());
+}
+
 function applyFilter(){
   const fr=document.getElementById('fFrom').value,to=document.getElementById('fTo').value;
   const ty=document.getElementById('fType').value,sp=document.getElementById('fSpecies').value;
+  // Tab 1: filter rawRM
   filteredRM=rawRM.filter(r=>{
     if(fr&&r.date<fr)return false;if(to&&r.date>to)return false;
-    if(ty!=='all'&&r.typeRM!==ty)return false;
-    if(sp!=='all'&&r.species!==sp)return false;
+    if(!_matchType(r.typeRM,ty))return false;
+    if(!_matchSpecies(r.species,sp))return false;
     return true;
   });
   const f2=d=>d?new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}):'?';
   document.getElementById('hdrPeriod').textContent=f2(fr)+' — '+f2(to)+' | Branch KH';
-  _renderTab1();_renderTab2();_renderTab3();
+  _renderTab1();_renderTab2(fr,to,ty,sp);_renderTab3(ty,sp);
 }
 function resetFilter(){
   if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const l=new Date(dates[dates.length-1]);const f=new Date(l);f.setDate(f.getDate()-29);document.getElementById('fFrom').value=_fmt(f);document.getElementById('fTo').value=_fmt(l);}
@@ -600,9 +614,18 @@ function _supTable(){
 }
 
 /* ══════ TAB 2 RENDER ══════ */
-function _renderTab2(){
-  const fr=document.getElementById('fFrom').value,to=document.getElementById('fTo').value;
-  const pf=planData.filter(r=>(!fr||r[0]>=fr)&&(!to||r[0]<=to));
+function _renderTab2(fr,to,ty,sp){
+  if(fr===undefined) fr=document.getElementById('fFrom').value;
+  if(to===undefined) to=document.getElementById('fTo').value;
+  if(ty===undefined) ty=document.getElementById('fType').value;
+  if(sp===undefined) sp=document.getElementById('fSpecies').value;
+  const pf=planData.filter(r=>{
+    if(fr&&r[0]<fr)return false;
+    if(to&&r[0]>to)return false;
+    if(!_matchType(r[4]||'',ty))return false;   // r[4] = typeRM
+    if(!_matchSpecies(r[6]||'',sp))return false; // r[6] = species
+    return true;
+  });
   const vol=pf.reduce((s,r)=>s+r[2],0),val=pf.reduce((s,r)=>s+r[2]*r[5],0);
   const price=vol?val/vol:0;
   _s('p-vol',_fK(vol));_s('p-val',_fM(val));_s('p-price',price.toFixed(0));_s('p-lot',pf.length.toString());
@@ -623,26 +646,29 @@ function _renderTab2(){
 }
 
 /* ══════ TAB 3 RENDER ══════ */
-function _renderTab3(){
-  const active=actualData.filter(d=>d.actVol>0);
-  const totVol=actualData.reduce((s,d)=>s+d.actVol,0);
-  const totPlan=actualData.reduce((s,d)=>s+d.planVol,0);
-  const totVal=actualData.reduce((s,d)=>s+d.actVal,0);
+function _renderTab3(ty,sp){
+  if(ty===undefined) ty=document.getElementById('fType').value;
+  if(sp===undefined) sp=document.getElementById('fSpecies').value;
+  // Filter actualData by type (species ไม่มีใน actualData — skip)
+  const filtAct = actualData.filter(d=>_matchType(d.type||'',ty));
+  const totVol=filtAct.reduce((s,d)=>s+d.actVol,0);
+  const totPlan=filtAct.reduce((s,d)=>s+d.planVol,0);
+  const totVal=filtAct.reduce((s,d)=>s+d.actVal,0);
   const kpiPct=totPlan?((totVol/totPlan)*100).toFixed(1):'0';
   _s('a-vol',_fK(totVol));_s('a-plan',_fK(totPlan));_s('a-val',_fM(totVal));_s('a-kpi',kpiPct+'%');
   // Month bar: plan vs actual
   const months=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   const mplan={},mact={};
-  actualData.forEach(d=>{mplan[d.month]=(mplan[d.month]||0)+d.planVol;mact[d.month]=(mact[d.month]||0)+d.actVol;});
+  filtAct.forEach(d=>{mplan[d.month]=(mplan[d.month]||0)+d.planVol;mact[d.month]=(mact[d.month]||0)+d.actVol;});
   const Lm=months.filter(m=>mplan[m]||mact[m]);
   _rb('cActMonth','actM',{type:'bar',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:[{label:'แผน',data:Lm.map(m=>mplan[m]||0),backgroundColor:'rgba(200,152,42,.5)',borderRadius:3},{label:'จริง',data:Lm.map(m=>mact[m]||0),backgroundColor:'rgba(0,200,151,.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
   // Price line
-  const mPrice={};actualData.forEach(d=>{if(!mPrice[d.month])mPrice[d.month]={};mPrice[d.month][d.type]=d.avgPrice;});
-  const types=[...new Set(actualData.map(d=>d.type))];
+  const mPrice={};filtAct.forEach(d=>{if(!mPrice[d.month])mPrice[d.month]={};mPrice[d.month][d.type]=d.avgPrice;});
+  const types=[...new Set(filtAct.map(d=>d.type))];
   const TC=['#C8982A','#00BCD4','#00C897'];
   _rb('cActPrice','actP',{type:'line',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:types.map((t,i)=>{return{label:t,data:Lm.map(m=>(mPrice[m]&&mPrice[m][t])||null),borderColor:TC[i%3],backgroundColor:TC[i%3]+'22',tension:.4,fill:false,pointRadius:3,spanGaps:true};})  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
   // Table
-  const actRows=actualData.filter(d=>d.actVol>0||d.planVol>0);
+  const actRows=filtAct.filter(d=>d.actVol>0||d.planVol>0);
   document.getElementById('actBody').innerHTML=actRows.map(d=>{
     const kpi=d.kpiPct,badge=kpi>=100?'kb-green':kpi>=70?'kb-amber':'kb-red';
     const tc=d.type.includes('จับเป็น')?'tg':'tb';
@@ -685,7 +711,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       hideAuth();
       document.getElementById('userLabel').textContent=sessionStorage.getItem('kst_user')||'';
       await loadAll();
-      setInterval(loadAll,1800000);
+      setInterval(loadAll,120000);
       return;
     }
     if(!handled)setAS('พร้อม — กด Sign in เพื่อเข้าสู่ระบบ');
