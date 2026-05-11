@@ -246,6 +246,38 @@ tr:hover td{background:rgba(200,152,42,.03)}
       <tbody id="supBody"></tbody>
     </table></div>
   </div>
+  <!-- Size vs Price Summary -->
+  <div class="row2b" style="margin-top:14px">
+    <div class="card">
+      <div class="ct"><span class="d"></span>ปริมาณซื้อแยกตาม Size (กก.)</div>
+      <div class="cs">เรียงจาก Size เล็ก → ใหญ่</div>
+      <div class="cw" style="height:200px"><canvas id="cSizeVol"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="d"></span>ราคาเฉลี่ยแยกตาม Size (฿/กก.)</div>
+      <div class="cs">ราคายิ่งเล็กยิ่งแพง</div>
+      <div class="cw" style="height:200px"><canvas id="cSizePrice"></canvas></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="ct"><span class="d"></span>สรุป Size vs ราคา vs ปริมาณ</div>
+    <div class="cs" style="margin-bottom:10px">ข้อมูลในช่วงที่เลือก</div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Size (ตัว/กก.)</th>
+          <th>ปริมาณ (กก.)</th>
+          <th>สัดส่วน (%)</th>
+          <th>ราคาเฉลี่ย (฿/กก.)</th>
+          <th>ราคาต่ำสุด</th>
+          <th>ราคาสูงสุด</th>
+          <th>Lot</th>
+          <th>กราฟ</th>
+        </tr></thead>
+        <tbody id="sizePriceBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- ══ TAB 2: PLAN_DAILY ══ -->
@@ -562,7 +594,7 @@ function _renderTab1(){
   _s('v-sup',sups.toLocaleString());_s('v-lot',f.length.toLocaleString());
   const[pv,pa,pp,ps,pl]=_prevRM();
   _delta('d-vol',vol,pv);_delta('d-val',val,pa);_delta('d-price',price,pp);_delta('d-sup',sups,ps);_delta('d-lot',f.length,pl);
-  _dailyChart();_typeDonut();_priceChart();_supBarChart();_supTable();
+  _dailyChart();_typeDonut();_priceChart();_supBarChart();_supTable();_renderSizePrice();
 }
 function _prevRM(){
   const fr=document.getElementById('fFrom').value,to=document.getElementById('fTo').value;
@@ -610,6 +642,107 @@ function _supTable(){
     const bw=Math.min(Math.round(d.vol/maxV*80),80),mt=[...d.ty].find(t=>t.includes('เป็น'))||[...d.ty][0]||'—';
     const tc=mt.includes('เป็น')?'tg':'tb';
     return `<tr><td><b>${rk}<\/b><\/td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}<\/td><td><span class="tag ${tc}">${mt}<\/span><\/td><td>${d.vol.toLocaleString()}<\/td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#C8982A,#E5B84A)"><\/div>${pct}%<\/div><\/td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}<\/td><td>${_fM(d.val)}<\/td><td>${d.n}<\/td><\/tr>`;
+  }).join('');
+}
+
+/* ══════ SIZE vs PRICE RENDER ══════ */
+function _renderSizePrice(){
+  const SIZE_ORDER=['≤30','31-40','41-50','51-60','61-70','71-80','81-100','101-120','121+'];
+  function sizeKey(n){
+    if(n<=30)return'≤30';if(n<=40)return'31-40';if(n<=50)return'41-50';
+    if(n<=60)return'51-60';if(n<=70)return'61-70';if(n<=80)return'71-80';
+    if(n<=100)return'81-100';if(n<=120)return'101-120';return'121+';
+  }
+  // Build size map from filteredRM
+  const sm={};
+  filteredRM.forEach(r=>{
+    if(!r.size||r.size<=0)return;
+    const k=sizeKey(r.size);
+    if(!sm[k])sm[k]={vol:0,prices:[],count:0};
+    sm[k].vol+=r.weight;
+    sm[k].count++;
+    if(r.price>0)sm[k].prices.push(r.price);
+  });
+
+  const sizes=SIZE_ORDER.filter(s=>sm[s]);
+  const vols=sizes.map(s=>sm[s].vol);
+  const avgPrices=sizes.map(s=>sm[s].prices.length?
+    sm[s].prices.reduce((a,b)=>a+b,0)/sm[s].prices.length:0);
+  const totVol=vols.reduce((a,b)=>a+b,0)||1;
+
+  // Volume bar chart
+  _rb('cSizeVol','sizeVol',{
+    type:'bar',
+    data:{
+      labels:sizes,
+      datasets:[{
+        label:'ปริมาณ (กก.)',
+        data:vols,
+        backgroundColor:sizes.map((_,i)=>`hsl(${200-i*12},70%,${55-i*3}%)`),
+        borderRadius:4
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
+        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}
+      }}
+  });
+
+  // Price line chart
+  _rb('cSizePrice','sizePrice',{
+    type:'bar',
+    data:{
+      labels:sizes,
+      datasets:[
+        {
+          label:'ราคาเฉลี่ย (฿/กก.)',
+          data:avgPrices.map(p=>p.toFixed(1)),
+          backgroundColor:'rgba(200,152,42,.7)',
+          borderColor:'#E5B84A',
+          borderWidth:1,
+          borderRadius:4,
+          yAxisID:'y'
+        }
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>'฿ '+parseFloat(ctx.raw).toFixed(0)+'/กก.'}}
+      },
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
+        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿ '+v,color:'#7A8CA3',font:{size:9}}}
+      }}
+  });
+
+  // Summary table
+  const tbody=document.getElementById('sizePriceBody');
+  const maxVol=Math.max(...vols)||1;
+  tbody.innerHTML=sizes.map((s,i)=>{
+    const d=sm[s];
+    const avgP=avgPrices[i];
+    const minP=d.prices.length?Math.min(...d.prices):0;
+    const maxP=d.prices.length?Math.max(...d.prices):0;
+    const pct=(d.vol/totVol*100).toFixed(1);
+    const barW=Math.round(d.vol/maxVol*100);
+    // Color: smaller size = warmer color
+    const hue=200-i*12;
+    const tagCls=i<3?'tg':i<6?'tb':'tn';
+    return '<tr>'+
+      '<td><span class="tag '+tagCls+'">'+s+'<\/span><\/td>'+
+      '<td>'+d.vol.toLocaleString()+'<\/td>'+
+      '<td><div style="display:flex;align-items:center;gap:5px">'+
+        '<div style="width:'+barW+'px;max-width:80px;height:5px;border-radius:2px;background:hsl('+hue+',70%,55%)"><\/div>'+
+        '<span>'+pct+'%<\/span><\/div><\/td>'+
+      '<td style="color:var(--gold-lt);font-weight:600">฿ '+avgP.toFixed(0)+'<\/td>'+
+      '<td style="color:var(--muted)">฿ '+minP.toFixed(0)+'<\/td>'+
+      '<td style="color:var(--muted)">฿ '+maxP.toFixed(0)+'<\/td>'+
+      '<td>'+d.count+'<\/td>'+
+      '<td><div style="width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl('+hue+',70%,55%),rgba(200,152,42,.3))"><\/div><\/td>'+
+      '<\/tr>';
   }).join('');
 }
 
