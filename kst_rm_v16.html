@@ -361,13 +361,14 @@ tr:hover td{background:rgba(200,152,42,.03)}
 const CFG1 = {  // ADD (5).xlsx — RM RECORD
   driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
   fileId: '014NXMQUBKW4HOOOFMRZBZIRWCDX6AHTJV',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRREthTFdlRjJ6MVRKYW9sMDJDU3RudkFZT1FJWkdZNjFlcFdlM3o3azJOZzZJP2U9T2ZOanBw',  // ADD (5).xlsx org-wide share
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQXF0dzduT0t5T1E1Ukd3aDM4QTgwMUFRZlpjMmlTTEl1MGMwbnNnd2xxZFRJP2U9UVNSR2Z4',  // ADD (5).xlsx org-wide share
   sheet:  'RM RECORD',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQXF0dzduT0t5T1E1Ukd3aDM4QTgwMUFRZlpjMmlTTEl1MGMwbnNnd2xxZFRJP2U9UVNSR2Z4',
 };
 const CFG2 = {  // Procurement_Master_File.xlsx
   driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
   fileId: '014NXMQUGKNC2Z4F3M6VGJNKEXJWBEVWPP',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQXF0dzduT0t5T1E1Ukd3aDM4QTgwMUFkUmhRSlg4dnllZ2V5YThpUmRTZkNRP2U9SUVmYkY0',  // Procurement_Master_File.xlsx org-wide share
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRREthTFdlRjJ6MVRKYW9sMDJDU3RudkFZT1FJWkdZNjFlcFdlM3o3azJOZzZJP2U9VnBzeWFn',  // Procurement org-wide share org-wide share
   sheetPlan:   'PLAN_DAILY',
   sheetActual: 'ACTUAL_TRACKING',
 };
@@ -576,7 +577,7 @@ async function loadAll(){
     setLB(0);
   }catch(e){
     console.error(e);
-    document.getElementById('snapBadge').style.display='inline';document.getElementById('dataBadge').style.display='none';setFS('⚠️ ใช้ Snapshot (OneDrive ไม่พร้อม) | RM: '+rawRM.length.toLocaleString()+' รายการ');
+    document.getElementById('snapBadge').style.display='inline';document.getElementById('dataBadge').style.display='none';setFS('📊 Snapshot Mode — RM: '+rawRM.length.toLocaleString()+' รายการ (OneDrive: '+e.message.slice(0,50)+')');
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
     setLB(0);
