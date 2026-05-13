@@ -12,6 +12,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KST — Procurement Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -445,36 +446,49 @@ async function graphGet(path){
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||r.statusText);}
   return r.json();
 }
-async function fetchSheet(cfg,sheet){
-  const enc=encodeURIComponent(sheet);
-  const errors=[];
+/* ══════════════════════════════════════════════
+   fetchSheet — ใช้ SheetJS download + parse
+   ทำงานได้กับ ALL org users (ไม่ใช้ Workbook API)
+   ══════════════════════════════════════════════ */
+async function fetchSheet(cfg, sheet){
+  const tok = await _getToken();
+  if(!tok) throw new Error('No token');
+  const errors = [];
 
-  /* ── Strategy 1: Workbook API ผ่าน Sharing Token โดยตรง
-       ใช้ /shares/{token}/driveItem/workbook/...
-       ทำงานได้กับ ทุก user ในองค์กรที่ได้รับ Share
-  ── */
+  /* ── Strategy 1: Download file binary → SheetJS parse
+       ใช้ /shares/{token}/driveItem/content
+       ไม่ใช้ Workbook API → ทำงานได้ทุก user ── */
   if(cfg.sharingToken){
     try{
-      const path='/shares/'+cfg.sharingToken+
-                 '/driveItem/workbook/worksheets/'+enc+'/usedRange?$select=values';
-      const r=await graphGet(path);
-      console.log('[KST] ✅ Sharing token direct workbook OK:', sheet, (r.values||[]).length,'rows');
-      return r.values||[];
+      const url = 'https://graph.microsoft.com/v1.0/shares/'+cfg.sharingToken+'/driveItem/content';
+      const res = await fetch(url, {headers:{Authorization:'Bearer '+tok}});
+      if(!res.ok){
+        const txt = await res.text();
+        throw new Error(res.status+' '+txt.slice(0,100));
+      }
+      const ab  = await res.arrayBuffer();
+      const wb  = XLSX.read(ab, {type:'array', cellDates:true});
+      const ws  = wb.Sheets[sheet];
+      if(!ws) throw new Error('Sheet "'+sheet+'" not found in file');
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, dateNF:'yyyy-mm-dd'});
+      console.log('[KST] ✅ SheetJS OK:', sheet, rows.length, 'rows');
+      return rows;
     }catch(e){
-      errors.push('sharingToken: '+e.message);
-      console.warn('[KST] Sharing token workbook failed:', e.message);
+      errors.push('SheetJS: '+e.message);
+      console.warn('[KST] SheetJS download failed:', e.message);
     }
   }
 
-  /* ── Strategy 2: Direct drive (owner only) ── */
+  /* ── Strategy 2: Workbook API ตรง (เจ้าของไฟล์) ── */
   try{
-    const r=await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
-                           '/workbook/worksheets/'+enc+'/usedRange?$select=values');
-    console.log('[KST] ✅ Direct drive OK:', sheet);
+    const enc = encodeURIComponent(sheet);
+    const r = await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
+                              '/workbook/worksheets/'+enc+'/usedRange?$select=values');
+    console.log('[KST] ✅ Workbook API OK:', sheet);
     return r.values||[];
   }catch(e){
-    errors.push('direct: '+e.message);
-    console.warn('[KST] Direct drive failed:', e.message);
+    errors.push('WorkbookAPI: '+e.message);
+    console.warn('[KST] Workbook API failed:', e.message);
   }
 
   throw new Error('ทุก method ล้มเหลว: '+errors.join(' | '));
