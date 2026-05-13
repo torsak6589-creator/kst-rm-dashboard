@@ -447,43 +447,65 @@ async function graphGet(path){
   return r.json();
 }
 /* ══════════════════════════════════════════════
-   fetchSheet — ใช้ SheetJS download + parse
-   ทำงานได้กับ ALL org users (ไม่ใช้ Workbook API)
+   fetchSheet v3 — 3 strategies
+   1. @microsoft.graph.downloadUrl (pre-auth, all users)
+   2. /content via sharing token
+   3. Workbook API (owner only)
    ══════════════════════════════════════════════ */
+async function _xlsxToRows(arrayBuffer, sheet){
+  const wb  = XLSX.read(arrayBuffer, {type:'array', cellDates:true});
+  const ws  = wb.Sheets[sheet];
+  if(!ws) throw new Error('Sheet "'+sheet+'" not found');
+  return XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, dateNF:'yyyy-mm-dd'});
+}
+
 async function fetchSheet(cfg, sheet){
   const tok = await _getToken();
   if(!tok) throw new Error('No token');
   const errors = [];
 
-  /* ── Strategy 1: Download file binary → SheetJS parse
-       ใช้ /shares/{token}/driveItem/content
-       ไม่ใช้ Workbook API → ทำงานได้ทุก user ── */
   if(cfg.sharingToken){
+    /* ── Strategy 1: ดึง @microsoft.graph.downloadUrl (pre-authenticated)
+         ไม่ต้องส่ง auth header ตอน download → bypass 403 ── */
     try{
-      const url = 'https://graph.microsoft.com/v1.0/shares/'+cfg.sharingToken+'/driveItem/content';
-      const res = await fetch(url, {headers:{Authorization:'Bearer '+tok}});
-      if(!res.ok){
-        const txt = await res.text();
-        throw new Error(res.status+' '+txt.slice(0,100));
+      const meta = await graphGet('/shares/'+cfg.sharingToken+
+        '/driveItem?$select=id,name,@microsoft.graph.downloadUrl');
+      const dlUrl = meta['@microsoft.graph.downloadUrl'];
+      if(dlUrl){
+        const res = await fetch(dlUrl); // no auth header needed!
+        if(!res.ok) throw new Error('download '+res.status);
+        const ab  = await res.arrayBuffer();
+        const rows= await _xlsxToRows(ab, sheet);
+        console.log('[KST] ✅ downloadUrl OK:', sheet, rows.length, 'rows');
+        return rows;
       }
+    }catch(e){
+      errors.push('downloadUrl: '+e.message);
+      console.warn('[KST] downloadUrl failed:', e.message);
+    }
+
+    /* ── Strategy 2: /content via sharing token ── */
+    try{
+      const res = await fetch(
+        'https://graph.microsoft.com/v1.0/shares/'+cfg.sharingToken+'/driveItem/content',
+        {headers:{Authorization:'Bearer '+tok}, redirect:'follow'}
+      );
+      if(!res.ok) throw new Error('content '+res.status);
       const ab  = await res.arrayBuffer();
-      const wb  = XLSX.read(ab, {type:'array', cellDates:true});
-      const ws  = wb.Sheets[sheet];
-      if(!ws) throw new Error('Sheet "'+sheet+'" not found in file');
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, dateNF:'yyyy-mm-dd'});
-      console.log('[KST] ✅ SheetJS OK:', sheet, rows.length, 'rows');
+      const rows= await _xlsxToRows(ab, sheet);
+      console.log('[KST] ✅ /content OK:', sheet, rows.length, 'rows');
       return rows;
     }catch(e){
-      errors.push('SheetJS: '+e.message);
-      console.warn('[KST] SheetJS download failed:', e.message);
+      errors.push('content: '+e.message);
+      console.warn('[KST] /content failed:', e.message);
     }
   }
 
-  /* ── Strategy 2: Workbook API ตรง (เจ้าของไฟล์) ── */
+  /* ── Strategy 3: Workbook API (owner only) ── */
   try{
     const enc = encodeURIComponent(sheet);
     const r = await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
-                              '/workbook/worksheets/'+enc+'/usedRange?$select=values');
+      '/workbook/worksheets/'+enc+'/usedRange?$select=values');
     console.log('[KST] ✅ Workbook API OK:', sheet);
     return r.values||[];
   }catch(e){
@@ -590,10 +612,24 @@ async function loadAll(){
     document.getElementById('footerTs').textContent='อัปเดต: '+_ts();
     setLB(0);
   }catch(e){
-    console.error(e);
-    document.getElementById('snapBadge').style.display='inline';document.getElementById('dataBadge').style.display='none';setFS('📊 Snapshot Mode — RM: '+rawRM.length.toLocaleString()+' รายการ (OneDrive: '+e.message.slice(0,50)+')');
+    console.warn('[KST] OneDrive failed → Snapshot:', e.message);
+    /* โหลด Static Snapshot ก่อน applyFilter() เสมอ */
+    rawRM      = _parseStaticData();
+    planData   = STATIC_PLAN;
+    actualData = STATIC_ACTUAL;
+    if(rawRM.length){
+      const dates  = rawRM.map(r=>r.date).sort();
+      const latest = new Date(dates[dates.length-1]);
+      const from   = new Date(latest); from.setDate(from.getDate()-29);
+      document.getElementById('fFrom').value = _fmt(from);
+      document.getElementById('fTo').value   = _fmt(latest);
+    }
+    document.getElementById('snapBadge').style.display='inline';
+    document.getElementById('dataBadge').style.display='none';
+    setFS('📊 Snapshot — RM: '+rawRM.length.toLocaleString()+' รายการ | '+_ts());
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
+    document.getElementById('footerTs').textContent='Snapshot: '+_ts();
     setLB(0);
   }
 }
