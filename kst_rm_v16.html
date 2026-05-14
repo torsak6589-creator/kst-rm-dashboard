@@ -444,29 +444,37 @@ function _logout(){['kst_at','kst_rt','kst_exp'].forEach(k=>sessionStorage.remov
 function signOut(){_logout();}
 
 /* ══════ GRAPH API ══════ */
-async function graphGet(path){
+async function graphGet(path, ms=15000){
   const tok=await _getToken();if(!tok)throw new Error('No token');
-  const r=await fetch('https://graph.microsoft.com/v1.0'+path,{headers:{Authorization:'Bearer '+tok}});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||r.statusText);}
-  return r.json();
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),ms);
+  try{
+    const r=await fetch('https://graph.microsoft.com/v1.0'+path,
+      {headers:{Authorization:'Bearer '+tok},signal:ctrl.signal});
+    clearTimeout(timer);
+    if(!r.ok){
+      let msg=r.statusText;
+      try{const e=await r.json();msg=e.error?.message||msg;}catch(_){}
+      throw new Error(msg+' ('+r.status+')');
+    }
+    return r.json();
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError')throw new Error('GraphAPI timeout '+ms+'ms');
+    throw e;
+  }
 }
-/* ══════════════════════════════════════════════
-   fetchSheet v4 — SharePoint Workbook API
-   1. Workbook API via sharing token (SharePoint → all users)
-   2. downloadUrl via sharing token (fallback)
-   3. Direct Workbook API (owner only)
-   ══════════════════════════════════════════════ */
+
 async function fetchSheet(cfg, sheet){
   const enc_s = encodeURIComponent(sheet);
   const errors = [];
 
-  /* ── Strategy 1: Workbook API ผ่าน Sharing Token
-       ใช้ได้กับ SharePoint Team Site + ทุก user ── */
   if(cfg.sharingToken){
+    /* Strategy 1: Workbook API via SharePoint sharing token */
     try{
       const path = '/shares/'+cfg.sharingToken+
         '/driveItem/workbook/worksheets/'+enc_s+'/usedRange?$select=values';
-      const r = await graphGet(path);
+      const r = await graphGet(path, 12000);
       console.log('[KST] ✅ Workbook/Token OK:', sheet, (r.values||[]).length, 'rows');
       return r.values||[];
     }catch(e){
@@ -474,13 +482,13 @@ async function fetchSheet(cfg, sheet){
       console.warn('[KST] Workbook/Token failed:', e.message);
     }
 
-    /* ── Strategy 2: downloadUrl → SheetJS ── */
+    /* Strategy 2: downloadUrl via sharing token + SheetJS */
     try{
       const meta = await graphGet('/shares/'+cfg.sharingToken+
-        '/driveItem?$select=id,name,@microsoft.graph.downloadUrl');
+        '/driveItem?$select=id,name,@microsoft.graph.downloadUrl', 10000);
       const dlUrl = meta['@microsoft.graph.downloadUrl'];
       if(dlUrl){
-        const res = await _fetchTimeout(dlUrl, {}, 25000);
+        const res = await _fetchTimeout(dlUrl, {}, 20000);
         if(!res.ok) throw new Error('download '+res.status);
         const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
         console.log('[KST] ✅ downloadUrl/SheetJS OK:', sheet, rows.length, 'rows');
@@ -492,10 +500,10 @@ async function fetchSheet(cfg, sheet){
     }
   }
 
-  /* ── Strategy 3: Direct Workbook API (owner only) ── */
+  /* Strategy 3: Direct Workbook API (owner only) */
   try{
     const r = await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
-      '/workbook/worksheets/'+enc_s+'/usedRange?$select=values');
+      '/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 12000);
     console.log('[KST] ✅ Direct Workbook OK:', sheet);
     return r.values||[];
   }catch(e){
@@ -505,6 +513,8 @@ async function fetchSheet(cfg, sheet){
 
   throw new Error('ทุก method ล้มเหลว: '+errors.join(' | '));
 }
+
+
 
 /* ══════ DATA STATE ══════ */
 let rawRM=[],filteredRM=[];
@@ -540,40 +550,75 @@ const _excl=t=>EXCL.some(x=>t.includes(x));
 
 /* ══════ LOAD ══════ */
 async function loadAll(){
-  setLB(10);setFS('⏳ กำลังดึงข้อมูลจาก OneDrive...');
-  try{
-    // Tab1: RM RECORD
-    setLB(20);
-    const rows=await fetchSheet(CFG1,CFG1.sheet);
-    if(rows.length>1){_detectCols(rows[0]);rawRM=rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));}
+  /* ══════════════════════════════════════
+     Step 1: แสดง Snapshot ทันที (ไม่รอ OneDrive)
+     ผู้ใช้เห็นข้อมูลได้เลย
+  ══════════════════════════════════════ */
+  if(!rawRM.length){
+    rawRM      = _parseStaticData();
+    planData   = STATIC_PLAN;
+    actualData = STATIC_ACTUAL;
+    if(rawRM.length){
+      const dates=rawRM.map(r=>r.date).sort();
+      const latest=new Date(dates[dates.length-1]);
+      const from=new Date(latest);from.setDate(from.getDate()-29);
+      document.getElementById('fFrom').value=_fmt(from);
+      document.getElementById('fTo').value=_fmt(latest);
+    }
+    document.getElementById('snapBadge').style.display='inline';
+    document.getElementById('dataBadge').style.display='none';
+    setFS('📊 Snapshot — RM: '+rawRM.length.toLocaleString()+' รายการ | กำลัง sync OneDrive...');
+    applyFilter();
+    document.getElementById('dashContent2').style.display='block';
+  }
 
-    // Tab2: PLAN_DAILY
-    setLB(50);
+  /* ══════════════════════════════════════
+     Step 2: ดึงข้อมูล OneDrive ใน background
+     ถ้าสำเร็จ → update live, ถ้าไม่ → snapshot ยังอยู่
+  ══════════════════════════════════════ */
+  setLB(10);
+  try{
+    // ── RM RECORD ──
+    setLB(20);
+    const rows = await fetchSheet(CFG1, CFG1.sheet);
+    if(rows && rows.length > 1){
+      _detectCols(rows[0]);
+      const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
+      if(liveRM.length > 0){
+        rawRM = liveRM;
+        console.log('[KST] ✅ Live RM:', rawRM.length, 'rows');
+      }
+    }
+
+    // ── PLAN_DAILY ──
+    setLB(55);
     try{
-      const pRows=await fetchSheet(CFG2,CFG2.sheetPlan);
-      if(pRows.length>2){
+      const pRows = await fetchSheet(CFG2, CFG2.sheetPlan);
+      if(pRows && pRows.length > 2){
         const newPlan=[];
         for(let i=2;i<pRows.length;i++){
           const r=pRows[i];if(!r[0])continue;
-          let d=r[0];if(typeof d==='number')d=new Date(Math.round((d-25569)*86400000));else d=new Date(d);
+          let d=r[0];
+          if(typeof d==='number'&&d>40000) d=new Date(Math.round((d-25569)*86400000));
+          else d=new Date(d);
           if(isNaN(d))continue;
           const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-          const w=_n(r[2]),t=String(r[4]||'').trim();
-          if(w<=0||EXCL.some(x=>t.includes(x)))continue;
+          const w=_n(r[2]),t=String(r[4]||'').trim().replace(/กุุ้ง/g,'กุ้ง');
+          if(w<=0||_excl(t))continue;
           newPlan.push([ds,String(r[1]||'').trim(),w,_n(r[3]),t,_n(r[5]),String(r[8]||'').trim()]);
         }
-        if(newPlan.length>0)planData=newPlan;
+        if(newPlan.length>0) planData=newPlan;
       }
-    }catch(e){console.warn('PLAN_DAILY fallback:',e.message);}
+    }catch(e){ console.warn('[KST] PLAN_DAILY fallback:', e.message); }
 
-    // Tab3: ACTUAL_TRACKING
-    setLB(75);
+    // ── ACTUAL_TRACKING ──
+    setLB(78);
     try{
-      const aRows=await fetchSheet(CFG2,CFG2.sheetActual);
+      const aRows = await fetchSheet(CFG2, CFG2.sheetActual);
       const MONTHS=['January','February','march','March','April','May','June','July','August','September','October','November','December'];
       const MO={'January':'มกราคม','February':'กุมภาพันธ์','march':'มีนาคม','March':'มีนาคม','April':'เมษายน','May':'พฤษภาคม','June':'มิถุนายน','July':'กรกฎาคม','August':'สิงหาคม','September':'กันยายน','October':'ตุลาคม','November':'พฤศจิกายน','December':'ธันวาคม'};
-      const newActual=[];
-      for(const r of aRows){
+      const newA=[];
+      for(const r of (aRows||[])){
         if(!r||!r[0])continue;
         const m=String(r[0]).trim();
         if(!MONTHS.includes(m))continue;
@@ -581,12 +626,13 @@ async function loadAll(){
         const yr=typeof r[8]==='number'?Math.round(r[8]):0;
         if(yr===2026){
           const sn=v=>{try{return parseFloat(v||0)}catch{return 0}};
-          newActual.push({month:MO[m]||m,type:String(r[1]).trim(),planVol:sn(r[2]),actVol:sn(r[3]),actVal:sn(r[4]),avgPrice:Math.round(sn(r[6])*100)/100,kpiPct:Math.round(sn(r[7])*10000)/100});
+          newA.push({month:MO[m]||m,type:String(r[1]).trim(),planVol:sn(r[2]),actVol:sn(r[3]),actVal:sn(r[4]),avgPrice:Math.round(sn(r[6])*100)/100,kpiPct:Math.round(sn(r[7])*10000)/100});
         }
       }
-      if(newActual.length>0)actualData=newActual;
-    }catch(e){console.warn('ACTUAL_TRACKING fallback:',e.message);}
+      if(newA.length>0) actualData=newA;
+    }catch(e){ console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
 
+    // ── Update date range ──
     setLB(90);
     if(rawRM.length){
       const dates=rawRM.map(r=>r.date).sort();
@@ -595,34 +641,28 @@ async function loadAll(){
       document.getElementById('fFrom').value=_fmt(from);
       document.getElementById('fTo').value=_fmt(latest);
     }
-    buildDropdowns();
+
     applyFilter();
-    document.getElementById('dashContent2').style.display='block';
-    setFS('✅ โหลดสำเร็จ — RM: '+rawRM.length.toLocaleString()+' | แผน: '+planData.length+' | KPI: '+actualData.length+' | '+_ts());
+    document.getElementById('snapBadge').style.display='none';
+    document.getElementById('dataBadge').style.display='inline';
+    setFS('✅ Live — RM: '+rawRM.length.toLocaleString()+' | แผน: '+planData.length+' | KPI: '+actualData.length+' | '+_ts());
     document.getElementById('footerTs').textContent='อัปเดต: '+_ts();
     setLB(0);
+
   }catch(e){
-    clearTimeout(_fbTimer);
-    const fb=document.getElementById('snapFallbackBtn');if(fb)fb.style.display='none';
-    console.warn('[KST] OneDrive failed → Snapshot:', e.message);
-    /* โหลด Static Snapshot ก่อน applyFilter() เสมอ */
-    rawRM      = _parseStaticData();
-    planData   = STATIC_PLAN;
-    actualData = STATIC_ACTUAL;
-    if(rawRM.length){
-      const dates  = rawRM.map(r=>r.date).sort();
-      const latest = new Date(dates[dates.length-1]);
-      const from   = new Date(latest); from.setDate(from.getDate()-29);
-      document.getElementById('fFrom').value = _fmt(from);
-      document.getElementById('fTo').value   = _fmt(latest);
-    }
+    console.warn('[KST] OneDrive sync failed:', e.message);
+    /* Snapshot ยังแสดงอยู่ — แค่ update status */
     document.getElementById('snapBadge').style.display='inline';
     document.getElementById('dataBadge').style.display='none';
-    setFS('📊 Snapshot — RM: '+rawRM.length.toLocaleString()+' รายการ | '+_ts());
-    applyFilter();
-    document.getElementById('dashContent2').style.display='block';
-    document.getElementById('footerTs').textContent='Snapshot: '+_ts();
+    setFS('📊 Snapshot (OneDrive: '+e.message.slice(0,60)+')');
     setLB(0);
+    if(!rawRM.length){
+      /* กรณีที่ snapshot ยังไม่โหลด */
+      rawRM=_parseStaticData();planData=STATIC_PLAN;actualData=STATIC_ACTUAL;
+      if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const latest=new Date(dates[dates.length-1]);const from=new Date(latest);from.setDate(from.getDate()-29);document.getElementById('fFrom').value=_fmt(from);document.getElementById('fTo').value=_fmt(latest);}
+      applyFilter();
+      document.getElementById('dashContent2').style.display='block';
+    }
   }
 }
 
