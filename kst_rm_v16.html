@@ -233,7 +233,12 @@ tr:hover td{background:rgba(200,152,42,.03)}
     </optgroup>
   </select>
   <span class="fl">| ชนิด:</span>
-  <select id="fSpecies" onchange="applyFilter()"><option value="all">ทั้งหมด</option></select>
+  <select id="fSpecies" onchange="applyFilter()">
+    <option value="all">ทั้งหมด</option>
+    <option value="กุ้งขาว">กุ้งขาว</option>
+    <option value="กุลาดำ">กุลาดำ</option>
+    <option value="กุ้งกุลาดำ">กุ้งกุลาดำ</option>
+  </select>
   <button class="btn-primary" onclick="applyFilter()">🔍 Apply</button>
   <button class="btn-sec" onclick="resetFilter()">↺ Reset</button>
   <button class="btn-refresh" onclick="refreshAll()">🔄 Refresh</button>
@@ -649,6 +654,7 @@ async function loadAll(){
       document.getElementById('fTo').value=_fmt(latest);
     }
 
+    _buildDropdowns();
     applyFilter();
     document.getElementById('snapBadge').style.display='none';
     document.getElementById('dataBadge').style.display='inline';
@@ -671,6 +677,19 @@ async function loadAll(){
       document.getElementById('dashContent2').style.display='block';
     }
   }
+}
+
+/* ══════ BUILD DROPDOWNS ══════ */
+function _buildDropdowns(){
+  // Build species dropdown from actual rawRM data
+  const speciesSel = document.getElementById('fSpecies');
+  const curVal = speciesSel.value;
+  const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
+  speciesSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
+    species.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+  // Restore selection
+  if([...speciesSel.options].some(o=>o.value===curVal)) speciesSel.value=curVal;
+  else speciesSel.value='all';
 }
 
 /* ══════ FILTER ══════ */
