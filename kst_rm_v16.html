@@ -628,6 +628,8 @@ async function loadAll(){
     setFS('📊 Snapshot '+rawRM.length.toLocaleString()+' รายการ | กำลัง sync OneDrive...');
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
+    // Pre-render Tab 4 with snapshot price data
+    if(priceData.length) setTimeout(_renderTab4, 200);
   }
 
   /* ══════════════════════════════════════
@@ -728,6 +730,7 @@ async function loadAll(){
         if(newPrice.length > 0){
           priceData = newPrice;
           console.log('[KST] ✅ ราคา RM คิดขาย live:', newPrice.length, 'rows');
+          _renderTab4(); // refresh Tab4 with live data
         }
       }
     }catch(e){ console.warn('[KST] ราคา RM fallback:', e.message); }
@@ -1119,7 +1122,7 @@ function _renderTab3(ty,sp){
 }
 
 /* ══════ TAB 4: PRICE FORECAST ══════ */
-let priceData = window.STATIC_PRICE || [];
+let priceData = (typeof STATIC_PRICE !== "undefined" && STATIC_PRICE.length) ? STATIC_PRICE : [];
 
 function _renderTab4(){
   if(!priceData.length) return;
