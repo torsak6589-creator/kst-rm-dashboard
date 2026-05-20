@@ -1125,7 +1125,13 @@ function _renderTab3(ty,sp){
 let priceData = (typeof STATIC_PRICE !== "undefined" && STATIC_PRICE.length) ? STATIC_PRICE : [];
 
 function _renderTab4(){
-  if(!priceData.length) return;
+  /* ใช้ priceData หรือ STATIC_PRICE โดยตรง */
+  const _pd = (priceData && _pd.length) ? priceData
+            : (typeof STATIC_PRICE!=='undefined' ? STATIC_PRICE : []);
+  if(!_pd.length){ console.warn('[KST] Tab4: no price data'); return; }
+
+  // Refresh global priceData
+  if(_pd.length > _pd.length) priceData = _pd;
 
   const monSel  = document.getElementById('prMonthSel');
   const weekSel = document.getElementById('prWeekSel');
@@ -1133,7 +1139,7 @@ function _renderTab4(){
   const selWeek = weekSel ? weekSel.value : 'all';
 
   // Populate month dropdown
-  const months = [...new Set(priceData.map(r=>r[0]))];
+  const months = [...new Set(_pd.map(r=>r[0]))];
   if(monSel && monSel.options.length <= 1){
     months.forEach(m => {
       const o = document.createElement('option');
@@ -1144,7 +1150,7 @@ function _renderTab4(){
 
   // Latest month+week
   const lastMon  = months[months.length-1];
-  const lastData = priceData.filter(r=>r[0]===lastMon);
+  const lastData = _pd.filter(r=>r[0]===lastMon);
   const lastWeek = lastData[lastData.length-1]?.[1] || '';
 
   // KPI — size 58-60 or closest
@@ -1180,7 +1186,7 @@ function _renderTab4(){
   const SIZE_REF = '58-60';
   const trendWF=[],trendBF=[];
   trendMons.forEach(m=>{
-    const rows = priceData.filter(r=>r[0]===m);
+    const rows = _pd.filter(r=>r[0]===m);
     const wks  = [...new Set(rows.map(r=>r[1]))];
     const lastWk = wks[wks.length-1];
     const row  = rows.find(r=>r[1]===lastWk&&r[2]===SIZE_REF);
@@ -1201,14 +1207,14 @@ function _renderTab4(){
       }}});
 
   // Table
-  const filt = priceData.filter(r=>
+  const filt = _pd.filter(r=>
     (selMon==='all'||r[0]===selMon) && (selWeek==='all'||r[1]===selWeek)
   );
 
   // Populate week dropdown
   if(weekSel && selMon!=='all'){
     const curWk = weekSel.value;
-    const wks = [...new Set(priceData.filter(r=>r[0]===selMon).map(r=>r[1]))];
+    const wks = [...new Set(_pd.filter(r=>r[0]===selMon).map(r=>r[1]))];
     weekSel.innerHTML='<option value="all">ทุกสัปดาห์<\/option>'+
       wks.map(w=>'<option value="'+w+'">'+w+'<\/option>').join('');
     if([...weekSel.options].some(o=>o.value===curWk)) weekSel.value=curWk;
