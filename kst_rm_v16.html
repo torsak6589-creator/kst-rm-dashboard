@@ -1126,12 +1126,11 @@ let priceData = (typeof STATIC_PRICE !== "undefined" && STATIC_PRICE.length) ? S
 
 function _renderTab4(){
   /* ใช้ priceData หรือ STATIC_PRICE โดยตรง */
-  const _pd = (priceData && _pd.length) ? priceData
-            : (typeof STATIC_PRICE!=='undefined' ? STATIC_PRICE : []);
-  if(!_pd.length){ console.warn('[KST] Tab4: no price data'); return; }
-
-  // Refresh global priceData
-  if(_pd.length > _pd.length) priceData = _pd;
+  // Use priceData if has records, else fallback to STATIC_PRICE directly
+  const _pd = (priceData && priceData.length > 0) ? priceData
+            : (typeof STATIC_PRICE !== 'undefined' && STATIC_PRICE.length > 0 ? STATIC_PRICE : []);
+  if(!_pd.length){ console.warn('[KST] Tab4: no price data (priceData='+priceData.length+', SP='+(typeof STATIC_PRICE!=='undefined'?STATIC_PRICE.length:0)+')'); return; }
+  if(_pd !== priceData) priceData = _pd;
 
   const monSel  = document.getElementById('prMonthSel');
   const weekSel = document.getElementById('prWeekSel');
