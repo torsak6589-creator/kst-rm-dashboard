@@ -412,20 +412,20 @@ tr:hover td{background:rgba(200,152,42,.03)}
 
 <script>
 /* ══════ CONFIG ══════ */
-const CFG1 = {  // ADD (5).xlsx — SharePoint KSTRMUPDATEV2
-  driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
-  fileId: '014NXMQUBKW4HOOOFMRZBZIRWCDX6AHTJV',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUNWcG1mU01GNUxUclkxaFZxR2FqWVlBZGhpck5GeFFJMFg1dFI5Y2RfcE01ND9lPWtvem1hYw',  // ADD (5).xlsx - org-wide
+const CFG1 = {
+  driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
+  fileId: '015324WXMVUZT5EMC6JNHLMNMFLKDGUNQY',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUJiNmY5LVRLeDRUWkJFWWg0eWExdXZBWWdVcjZKclJTZ2xYdWtyS3djMEdjdz9lPXF4OGZXdw',
   sheet: 'RM RECORD',
 };
-const CFG2 = {  // Procurement_Master_File.xlsx — SharePoint KSTRMUPDATEV2
+const CFG2 = {
   driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
-  fileId: '015324WXINNNSGHN2535AYLU44MS242XMI',
+  fileId: '015324WXPDOOQEKDGMYNCJEIE64EYHHBDD',
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUJiNmY5LVRLeDRUWkJFWWg0eWExdXZBWjc1V0toX2dVU0YwTTBET1VBd21iST9lPXVEbERNZw',
+  tokenPrice:  'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBVHpGY1JjWUNWVU9QS0ZTXzNKdWNCVT9lPTJESVJCMg',
   sheetPlan:   'PLAN_DAILY',
   sheetActual: 'ACTUAL_TRACKING',
   sheetPrice:  'ราคา  RM คิดขาย',
-  tokenPrice:  'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBVHpGY1JjWUNWVU9QS0ZTXzNKdWNCVT9lPTJESVJCMg',
 };
 const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_v16.html';
 const SCOPES = 'Files.Read User.Read offline_access';
@@ -516,55 +516,55 @@ async function graphGet(path, ms=15000){
   }
 }
 
+/* ════════════════════════════════════════
+   fetchSheet v5 — SharePoint Direct First
+   1. Direct SharePoint Drive (org site members)
+   2. Workbook via Sharing Token (fallback)
+   3. downloadUrl + SheetJS (fallback)
+   ════════════════════════════════════════ */
 async function fetchSheet(cfg, sheet){
   const enc_s = encodeURIComponent(sheet);
   const errors = [];
 
-  if(cfg.sharingToken){
-    /* Strategy 1: Workbook API via SharePoint sharing token */
-    try{
-      const path = '/shares/'+cfg.sharingToken+
-        '/driveItem/workbook/worksheets/'+enc_s+'/usedRange?$select=values';
-      const r = await graphGet(path, 12000);
-      console.log('[KST] ✅ Workbook/Token OK:', sheet, (r.values||[]).length, 'rows');
-      return r.values||[];
-    }catch(e){
-      errors.push('WorkbookToken: '+e.message);
-      console.warn('[KST] Workbook/Token failed:', e.message);
-    }
-
-    /* Strategy 2: downloadUrl via sharing token + SheetJS */
-    try{
-      const meta = await graphGet('/shares/'+cfg.sharingToken+
-        '/driveItem?$select=id,name,@microsoft.graph.downloadUrl', 10000);
-      const dlUrl = meta['@microsoft.graph.downloadUrl'];
-      if(dlUrl){
-        const res = await _fetchTimeout(dlUrl, {}, 20000);
-        if(!res.ok) throw new Error('download '+res.status);
-        const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
-        console.log('[KST] ✅ downloadUrl/SheetJS OK:', sheet, rows.length, 'rows');
-        return rows;
-      }
-    }catch(e){
-      errors.push('downloadUrl: '+e.message);
-      console.warn('[KST] downloadUrl failed:', e.message);
-    }
-  }
-
-  /* Strategy 3: Direct Workbook API (owner only) */
+  /* Strategy 1: Direct SharePoint Drive → all site members */
   try{
     const r = await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
-      '/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 12000);
-    console.log('[KST] ✅ Direct Workbook OK:', sheet);
+      '/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 15000);
+    console.log('[KST] ✅ Direct Drive OK:', sheet, (r.values||[]).length, 'rows');
     return r.values||[];
   }catch(e){
-    errors.push('DirectWorkbook: '+e.message);
-    console.warn('[KST] Direct Workbook failed:', e.message);
+    errors.push('Direct: '+e.message);
+    console.warn('[KST] Direct Drive failed:', e.message);
+  }
+
+  /* Strategy 2: Sharing Token Workbook */
+  if(cfg.sharingToken){
+    try{
+      const r = await graphGet('/shares/'+cfg.sharingToken+
+        '/driveItem/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 15000);
+      console.log('[KST] ✅ Token OK:', sheet, (r.values||[]).length, 'rows');
+      return r.values||[];
+    }catch(e){
+      errors.push('Token: '+e.message);
+    }
+
+    /* Strategy 3: downloadUrl + SheetJS */
+    try{
+      const meta = await graphGet('/shares/'+cfg.sharingToken+
+        '/driveItem?$select=@microsoft.graph.downloadUrl', 10000);
+      const dlUrl = meta['@microsoft.graph.downloadUrl'];
+      if(dlUrl){
+        const res = await _fetchTimeout(dlUrl, {}, 25000);
+        if(!res.ok) throw new Error(res.status);
+        const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
+        console.log('[KST] ✅ SheetJS OK:', sheet, rows.length, 'rows');
+        return rows;
+      }
+    }catch(e){ errors.push('SheetJS: '+e.message); }
   }
 
   throw new Error('ทุก method ล้มเหลว: '+errors.join(' | '));
 }
-
 
 
 /* ══════ DATA STATE ══════ */
