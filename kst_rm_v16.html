@@ -414,7 +414,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
 /* ══════ CONFIG ══════ */
 const CFG1 = {
   driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
-  fileId: '015324WXMVUZT5EMC6JNHLMNMFLKDGUNQY',
+  fileId: '015324WXLMMRNB2BS3WFGJEOKHCVFBO55Q',
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUJzWkZvZEJsdXhUSkk1UnhWS0YzZXdBWFlydUttMjZ3WlF0d0IzaTFPWGRpND9lPTB2UEx3Ug',
   sheet: 'RM RECORD',
 };
@@ -1330,7 +1330,7 @@ if ('serviceWorker' in navigator) {
     try {
       // Clear old caches first
       const keys = await caches.keys();
-      await Promise.all(keys.filter(k => k !== 'kst-rm-v16').map(k => caches.delete(k)));
+      await Promise.all(keys.filter(k => k !== 'kst-rm-v16b').map(k => caches.delete(k)));
       const reg = await navigator.serviceWorker.register('./sw.js');
       console.log('[KST] SW registered v13:', reg.scope);
     } catch(err) {
