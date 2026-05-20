@@ -690,6 +690,48 @@ async function loadAll(){
       if(newA.length>0) actualData=newA;
     }catch(e){ console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
 
+    // ── ราคา RM คิดขาย ──
+    setLB(85);
+    try{
+      const priceCFG = {
+        driveId: CFG2.driveId,
+        fileId:  CFG2.fileId,
+        sharingToken: CFG2.tokenPrice || CFG2.sharingToken,
+      };
+      const prRows = await fetchSheet(priceCFG, CFG2.sheetPrice);
+      if(prRows && prRows.length > 8){
+        const newPrice = [];
+        const hdr = prRows[8]; // header row
+        const colMonth = 2, colWeek = 3, colSize = 5;
+        const colWF = 6, colWL = 7, colBF = 8, colBL = 9;
+        const MONTHS_TH2 = {
+          'มกราคม':'มกราคม','กุมภาพันธ์':'กุมภาพันธ์','มีนาคม':'มีนาคม',
+          'เมษายน':'เมษายน','พฤษภาคม':'พฤษภาคม','มิถุนายน':'มิถุนายน',
+          'กรกฎาคม':'กรกฎาคม','สิงหาคม':'สิงหาคม','กันยายน':'กันยายน',
+          'ตุลาคม':'ตุลาคม','พฤศจิกายน':'พฤศจิกายน','ธันวาคม':'ธันวาคม'
+        };
+        for(let i=9;i<prRows.length;i++){
+          const r=prRows[i];
+          if(!r||!r[0])continue;
+          // Only 2026 rows (col 0 = ปี)
+          const yr = parseFloat(r[0]);
+          if(yr !== 2026) continue;
+          const month = String(r[colMonth]||'').trim();
+          const week  = String(r[colWeek] ||'').trim();
+          const size  = String(r[colSize] ||'').trim();
+          if(!MONTHS_TH2[month]||!size) continue;
+          const sn2=v=>{try{const x=parseFloat(String(v||'').replace(/,/g,''));return x>0?Math.round(x*10)/10:0;}catch{return 0;}};
+          const wf=sn2(r[colWF]), wl=sn2(r[colWL]), bf=sn2(r[colBF]), bl=sn2(r[colBL]);
+          if(wf+wl+bf+bl===0) continue;
+          newPrice.push([month, week, size, wf, wl, bf, bl]);
+        }
+        if(newPrice.length > 0){
+          priceData = newPrice;
+          console.log('[KST] ✅ ราคา RM คิดขาย live:', newPrice.length, 'rows');
+        }
+      }
+    }catch(e){ console.warn('[KST] ราคา RM fallback:', e.message); }
+
     // ── Update date range ──
     setLB(90);
     if(rawRM.length){
