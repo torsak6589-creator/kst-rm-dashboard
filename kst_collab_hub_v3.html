@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KST Collaborative Hub v3 — Production</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK (Compat v10) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+/* ══ TORSAK ARUNPAN — KST DESIGN SYSTEM ══════════════════════════ */
+:root{
+  --void:#0A0F1E; --navy:#1A1F3E; --navyL:#252A50;
+  --cyan:#00E5FF; --cd:rgba(0,229,255,0.12); --cg:rgba(0,229,255,0.06);
+  --violet:#7B61FF; --vd:rgba(123,97,255,0.12);
+  --silver:#E8ECF1; --slate:#6B7A8D;
+  --ok:#00D68F; --warn:#FFB800; --err:#FF4757; --org:#FF9F43;
+  --glass:rgba(26,31,62,0.7); --border:rgba(0,229,255,0.12);
+  --bg:#070B17; --r:12px; --r-lg:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'DM Sans','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--silver);font-size:13px;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 25%,rgba(123,97,255,0.07),transparent 55%),radial-gradient(ellipse at 85% 75%,rgba(0,229,255,0.05),transparent 55%);pointer-events:none;z-index:0}
+#app{position:relative;z-index:1}
+.sg{font-family:'Space Grotesk',sans-serif}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── GLASS CARD ── */
+.gc{background:var(--glass);border:1px solid var(--border);border-radius:var(--r-lg);backdrop-filter:blur(12px);margin-bottom:13px;overflow:hidden}
+.gh{padding:11px 17px;font-weight:700;font-size:12px;color:var(--silver);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(0,229,255,0.025);font-family:'Space Grotesk',sans-serif;letter-spacing:.3px}
+.gb{padding:14px 17px}
+
+/* ── METRICS ── */
+.mr{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:13px}
+.mc{background:var(--glass);border-radius:var(--r);padding:11px 13px;flex:1;min-width:108px;backdrop-filter:blur(8px)}
+.mc .l{font-size:9px;color:var(--slate);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;font-family:'Space Grotesk',sans-serif}
+.mc .v{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;line-height:1.2}
+.mc .u{font-size:9px;color:var(--slate);margin-top:1px}
+.mc .s{font-size:9px;margin-top:2px;font-weight:600;opacity:.85}
+
+/* ── TABLE ── */
+.tw{border-radius:10px;border:1px solid var(--border);overflow-x:auto;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--void);color:var(--cyan);padding:7px 10px;font-weight:700;font-size:9px;font-family:'Space Grotesk',sans-serif;letter-spacing:.5px;border-bottom:1px solid rgba(0,229,255,0.22);white-space:nowrap;text-align:left}
+thead th.r{text-align:right}
+tbody td{padding:6px 10px;border-bottom:1px solid rgba(0,229,255,0.06);white-space:nowrap;color:var(--silver)}
+tbody td.r{text-align:right;font-family:'JetBrains Mono',monospace}
+tbody tr:nth-child(even){background:rgba(0,229,255,0.018)}
+tbody tr:hover{background:rgba(0,229,255,0.032)}
+
+/* ── BADGE ── */
+.bd{display:inline-block;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;letter-spacing:.3px;font-family:'Space Grotesk',sans-serif;border:1px solid transparent}
+
+/* ── BUTTONS ── */
+.bt{border-radius:8px;font-weight:700;font-family:'Space Grotesk','Noto Sans Thai',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;border:1px solid transparent;padding:7px 15px;font-size:12px}
+.bt:disabled{opacity:.5;cursor:not-allowed}
+.bt:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+.bt-c{background:var(--cd);color:var(--cyan);border-color:rgba(0,229,255,0.3)}
+.bt-v{background:var(--vd);color:var(--violet);border-color:rgba(123,97,255,0.3)}
+.bt-ok{background:rgba(0,214,143,0.12);color:var(--ok);border-color:rgba(0,214,143,0.3)}
+.bt-e{background:rgba(255,71,87,0.12);color:var(--err);border-color:rgba(255,71,87,0.3)}
+.bt-w{background:rgba(255,184,0,0.12);color:var(--warn);border-color:rgba(255,184,0,0.3)}
+.bt-g{background:transparent;color:var(--slate);border-color:var(--border)}
+.bt-sm{padding:4px 10px;font-size:10.5px}
+.bt-icon{padding:5px 9px;font-size:12px}
+
+/* ── FORM ── */
+.fr{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:9px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.5px;font-family:'Space Grotesk',sans-serif}
+.fg input,.fg select,.fg textarea{background:rgba(10,15,30,0.85);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12px;color:var(--silver);outline:none;transition:border-color .15s;font-family:'DM Sans','Noto Sans Thai',sans-serif}
+.fg input[type=number]{font-family:'JetBrains Mono',monospace}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:rgba(0,229,255,0.45);box-shadow:0 0 0 2px rgba(0,229,255,0.07)}
+.fg select option{background:#0A0F1E}
+.fg textarea{resize:vertical;min-height:60px}
+hr.dv{border:none;border-top:1px solid var(--border);margin:11px 0}
+.info-box{border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:10px}
+
+/* ── NEON BAR ── */
+.nt{background:rgba(255,255,255,0.04);border-radius:4px;height:8px;overflow:hidden;margin-bottom:9px}
+.nf{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* ── LAYOUT ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:700px){.g2{grid-template-columns:1fr}}
+.main{padding:14px;max-width:1100px;margin:0 auto}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--glass);backdrop-filter:blur(22px);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(0,229,255,0.2);position:sticky;top:0;z-index:200;box-shadow:0 2px 20px rgba(0,0,0,0.3)}
+.statusbar{background:rgba(7,11,23,0.9);padding:5px 18px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.notif-strip{background:rgba(0,229,255,0.03);border-bottom:1px solid var(--border);padding:5px 18px;display:flex;gap:14px;overflow-x:auto;align-items:center}
+
+/* ── CONNECTION STATUS ── */
+#connStatus{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:16px;font-size:9px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:.3px;transition:all .3s}
+#connStatus.connected{background:rgba(0,214,143,0.12);color:var(--ok);border:1px solid rgba(0,214,143,0.3)}
+#connStatus.connecting{background:rgba(255,184,0,0.12);color:var(--warn);border:1px solid rgba(255,184,0,0.3)}
+#connStatus.disconnected{background:rgba(255,71,87,0.12);color:var(--err);border:1px solid rgba(255,71,87,0.3)}
+.conn-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ── SETUP OVERLAY ── */
+#setupOverlay{position:fixed;inset:0;background:rgba(7,11,23,0.97);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px)}
+.setup-card{background:var(--navy);border:1px solid var(--border);border-radius:20px;max-width:560px;width:100%;padding:32px;max-height:90vh;overflow-y:auto}
+.setup-step{display:flex;gap:12px;margin-bottom:16px;padding:14px;background:rgba(0,229,255,0.04);border:1px solid var(--border);border-radius:12px}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--cd);border:1px solid rgba(0,229,255,0.3);color:var(--cyan);font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Space Grotesk',sans-serif}
+.code-block{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--cyan);margin:6px 0;overflow-x:auto;white-space:pre}
+.copy-btn{background:var(--cd);border:1px solid rgba(0,229,255,0.2);color:var(--cyan);border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-weight:700}
+
+/* ── ROLE SELECT ── */
+.role-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:520px;width:100%}
+.role-card{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px 12px;cursor:pointer;text-align:center;backdrop-filter:blur(10px);transition:all .2s;font-family:'DM Sans',sans-serif}
+.role-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.4)}
+
+/* ── BATCH ITEM ── */
+.bi{padding:9px 11px;border-radius:9px;border:1px solid var(--border);margin-bottom:7px;cursor:pointer;transition:all .2s}
+.bi.sel{border-color:rgba(0,214,143,0.5);background:rgba(0,214,143,0.07)}
+.bi:hover{border-color:rgba(0,229,255,0.3)}
+
+/* ── DEPT STATUS ── */
+.dp{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:16px}
+.dot{width:6px;height:6px;border-radius:50%}
+
+/* ── ANIMATIONS ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+.pu{animation:pulse 2s ease infinite}
+.fi{animation:fadeIn .25s ease}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(0,229,255,0.2);border-radius:2px}
+
+/* ── PRINT ── */
+@media print{.topbar,.statusbar,.notif-strip,.bt,#setupOverlay{display:none!important}.gc{box-shadow:none}}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP OVERLAY ════════════════════════════════════════════ -->
+<div id="setupOverlay" style="display:none">
+  <div class="setup-card">
+    <div style="text-align:center;margin-bottom:24px">
+      <img id="setupLogo" alt="KST" style="height:60px;margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(0,229,255,0.3))">
+      <div style="font-family:'Space Grotesk',sans-serif;color:var(--silver);font-size:18px;font-weight:700;margin-bottom:4px">KST Collaborative Hub</div>
+      <div style="color:var(--cyan);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">PRODUCTION SETUP — FIREBASE REALTIME DB</div>
+      <div style="color:var(--slate);font-size:11px">ตั้งค่าครั้งเดียว ใช้ได้ตลอด — ใช้เวลา ~10 นาที</div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">1</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--silver);font-size:12px;margin-bottom:4px;font-family:'Space Grotesk',sans-serif">สร้าง Firebase Project</div>
+        <div style="color:var(--slate);font-size:11px;margin-bottom:6px">ไปที่ <span style="color:var(--cyan)">console.firebase.google.com</span> → Add project → ชื่อ "kst-collab" → ไม่ต้อง Google Analytics</div>
+        <a href="https://console.firebase.google.com" target="_blank" class="bt bt-c bt-sm" style="text-decoration:none;display:inline-flex">🔗 เปิด Firebase Console</a>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">2</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--silver);font-size:12px;margin-bottom:4px;font-family:'Space Grotesk',sans-serif">เปิด Realtime Database</div>
+        <div style="color:var(--slate);font-size:11px;margin-bottom:4px">Build → Realtime Database → Create database → เลือก <b>Southeast Asia</b> → Start in <b>test mode</b> (30 วัน จากนั้นตั้ง Rules)</div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">3</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--silver);font-size:12px;margin-bottom:4px;font-family:'Space Grotesk',sans-serif">ตั้ง Security Rules (หลัง 30 วัน)</div>
+        <div style="color:var(--slate);font-size:11px;margin-bottom:4px">Realtime Database → Rules → วางโค้ดนี้:</div>
+        <div class="code-block">{
+  "rules": {
+    "kst": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}</div>
+        <div style="color:var(--slate);font-size:10px">* สำหรับใช้ภายใน — ปลอดภัยพอสำหรับ internal tool</div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">4</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--silver);font-size:12px;margin-bottom:4px;font-family:'Space Grotesk',sans-serif">คัดลอก Firebase Config</div>
+        <div style="color:var(--slate);font-size:11px;margin-bottom:4px">Project Settings (⚙️) → Your apps → Web app → Register app → คัดลอก firebaseConfig</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(0,229,255,0.05);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:var(--silver);margin-bottom:12px">วาง Firebase Config ที่นี่</div>
+      <div class="fg" style="margin-bottom:8px">
+        <label>API KEY</label>
+        <input type="text" id="cfgApiKey" placeholder="AIzaSyXXXXXXXXXXXXXXXXXX">
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label>AUTH DOMAIN</label>
+        <input type="text" id="cfgAuthDomain" placeholder="kst-collab.firebaseapp.com">
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label>DATABASE URL</label>
+        <input type="text" id="cfgDbUrl" placeholder="https://kst-collab-default-rtdb.asia-southeast1.firebasedatabase.app">
+      </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label>PROJECT ID</label>
+        <input type="text" id="cfgProjectId" placeholder="kst-collab">
+      </div>
+      <button class="bt bt-ok" onclick="saveConfig()" style="width:100%;justify-content:center">✓ บันทึกและเชื่อมต่อ Firebase</button>
+    </div>
+
+    <div style="text-align:center;color:var(--slate);font-size:10px">Config บันทึกใน localStorage ของ browser นี้เท่านั้น · ไม่มีการส่งออก</div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══════════════════════════════════════════════════ -->
+<div id="app"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// KST COLLABORATIVE HUB v3 — PRODUCTION (Firebase Realtime DB)
+// by TORSAK ARUNPAN — AI Strategist & Tech Advisor
+// "Think Structured. Build Smart."
+// ════════════════════════════════════════════════════════════════
+
+// ── KST LOGO ─────────────────────────────────────────────────────
+const LOGO = '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';
+
+// ── CONSTANTS ────────────────────────────────────────────────────
+const T={cyan:'#00E5FF',cd:'rgba(0,229,255,0.12)',violet:'#7B61FF',vd:'rgba(123,97,255,0.12)',silver:'#E8ECF1',slate:'#6B7A8D',ok:'#00D68F',warn:'#FFB800',err:'#FF4757',org:'#FF9F43',glass:'rgba(26,31,62,0.7)',border:'rgba(0,229,255,0.12)'};
+
+const ROLES=[
+  {id:'planning',   l:'วางแผน',    s:'Planning',      e:'🎯',c:'#7B61FF',b:'rgba(123,97,255,0.12)'},
+  {id:'procurement',l:'จัดซื้อ RM',s:'Procurement',   e:'🛒',c:'#FFB800',b:'rgba(255,184,0,0.12)'},
+  {id:'production', l:'ผลิต',      s:'Production',    e:'🏭',c:'#00E5FF',b:'rgba(0,229,255,0.10)'},
+  {id:'qc',         l:'QC',        s:'Quality Ctrl',  e:'🔬',c:'#00D68F',b:'rgba(0,214,143,0.12)'},
+  {id:'sales',      l:'ขาย',       s:'Sales',         e:'📦',c:'#FF9F43',b:'rgba(255,159,67,0.12)'},
+  {id:'management', l:'ผู้บริหาร', s:'Management',    e:'👔',c:'#00E5FF',b:'rgba(0,229,255,0.06)'},
+];
+
+const SPEC={
+  '21/25':{y:.6526,p:49.95,s:310.46,u:3.20,rm:'38-44'},
+  '26/30':{y:.6526,p:51.18,s:281.02,u:3.00,rm:'52-63'},
+  '31/40':{y:.6436,p:52.78,s:262.53,u:2.85,rm:'67-74'},
+  '41/50':{y:.6435,p:53.54,s:247.79,u:2.65,rm:'77-83'},
+  '51/60':{y:.6286,p:56.19,s:231.19,u:2.50,rm:'97-110'},
+  '71/90':{y:.6154,p:65.58,s:219.96,u:2.20,rm:'135-145'},
+  '91/120':{y:.6035,p:71.82,s:212.66,u:2.00,rm:'150-175'},
+};
+const SIZES=Object.keys(SPEC), FX=32.35, KGC=14.17;
+const DB_PATH='kst'; // Firebase root path
+
+// ── FIREBASE ─────────────────────────────────────────────────────
+let db=null, connected=false;
+
+// ── FIREBASE CONFIG (hardcoded) ──────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:           "AIzaSyA8pXNROEw0SDulku380KLjE4YHGoadyyQ",
+  authDomain:       "kst-collab.firebaseapp.com",
+  databaseURL:      "https://kst-collab-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:        "kst-collab",
+  storageBucket:    "kst-collab.firebasestorage.app",
+  messagingSenderId:"797075927152",
+  appId:            "1:797075927152:web:19b9600581cd1b15c744b5",
+  measurementId:    "G-Q0KH9DH06T"
+};
+
+function getConfig(){ return FIREBASE_CONFIG; }
+function saveConfig(){ /* not used — config is hardcoded */ }
+
+function initFirebase(cfg){
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(cfg);
+    db=firebase.database();
+    setConnStatus('connecting');
+    // Monitor connection
+    db.ref('.info/connected').on('value', snap=>{
+      connected=!!snap.val();
+      setConnStatus(connected?'connected':'disconnected');
+    });
+    // Subscribe to all data — real-time push
+    subscribeAll();
+    console.log('✅ Firebase connected');
+  }catch(e){
+    console.error('Firebase init error:', e);
+    setConnStatus('disconnected');
+    alert('Firebase config error: '+e.message);
+  }
+}
+
+function setConnStatus(status){
+  const el=document.getElementById('connStatus');
+  if(!el)return;
+  el.className='connecting'; // reset
+  el.className=status;
+  const dot=el.querySelector('.conn-dot');
+  const lbl=el.querySelector('.conn-label');
+  if(dot)dot.style.animation=status==='connected'?'pulse 2s ease infinite':'none';
+  if(lbl)lbl.textContent={connected:'CONNECTED',connecting:'CONNECTING...',disconnected:'OFFLINE'}[status]||status.toUpperCase();
+}
+
+// ── REAL-TIME SUBSCRIPTIONS ───────────────────────────────────────
+const REFS=['orders','targets','pos','actuals','qc','shipments','notifications'];
+
+function subscribeAll(){
+  if(!db)return;
+  REFS.forEach(ref=>{
+    db.ref(`${DB_PATH}/${ref}`).on('value', snap=>{
+      const val=snap.val();
+      S.data[ref]=val?Object.values(val):[];
+      S.lastSync=new Date();
+      render();
+    });
+  });
+}
+
+// Firebase write helpers
+async function fbSet(path, data){
+  if(!db){ console.warn('Firebase not ready'); return; }
+  await db.ref(`${DB_PATH}/${path}/${data.id}`).set(data);
+}
+async function fbUpdate(path, id, data){
+  if(!db)return;
+  await db.ref(`${DB_PATH}/${path}/${id}`).update(data);
+}
+async function fbDelete(path, id){
+  if(!db)return;
+  await db.ref(`${DB_PATH}/${path}/${id}`).remove();
+}
+function fbNotif(dept, msg, level='info'){
+  if(!db)return;
+  const id='n'+Date.now();
+  db.ref(`${DB_PATH}/notifications/${id}`).set({id,dept,msg,level,time:Date.now()});
+  // Clean old notifications (keep last 30)
+  db.ref(`${DB_PATH}/notifications`).once('value',snap=>{
+    const all=snap.val();
+    if(!all)return;
+    const keys=Object.keys(all).sort();
+    if(keys.length>30) keys.slice(0,keys.length-30).forEach(k=>db.ref(`${DB_PATH}/notifications/${k}`).remove());
+  });
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────
+const fmt=(n,d=0)=>n==null||isNaN(n)?'—':Number(n).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=n=>n==null||isNaN(n)?'—':n.toFixed(1)+'%';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtTime=d=>new Date(d).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+const spv=sz=>SPEC[sz]||SPEC['31/40'];
+
+// ── APP STATE ──────────────────────────────────────────────────────
+let S={
+  role:null, lastSync:null,
+  data:{orders:[],targets:[],pos:[],actuals:[],qc:[],shipments:[],notifications:[]},
+  // Form states
+  pf:{sz:'31/40',ct:100,pr:'',note:''},
+  tf:{dt:today(),fg:5000,note:''},
+  pof:{farm:'',sz:'31/40',qty:'',pr:'',dt:today(),status:'confirmed'},
+  prd:{dt:today(),sz:'31/40',fg:'',rm:'',mhr:'',shift:'A'},
+  selBatch:null,
+  gr:{a:0,b:0,c:0,d:0,bk:0,def:0,notes:''},
+  shf:{cust:'',con:'',sz:'31/40',kg:'',pr:'',dt:today(),note:''},
+};
+
+// ── DOM BUILDER ───────────────────────────────────────────────────
+function el(tag,at={},ch){
+  const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(at)){
+    if(k==='style'&&typeof v==='object')Object.assign(e.style,v);
+    else if(k.startsWith('on'))e.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==='html')e.innerHTML=v;
+    else e.setAttribute(k,v);
+  }
+  if(Array.isArray(ch))ch.filter(Boolean).forEach(c=>e.appendChild(typeof c==='string'?document.createTextNode(c):c));
+  else if(ch instanceof Node)e.appendChild(ch);
+  else if(typeof ch==='string'&&!at.html)e.textContent=ch;
+  return e;
+}
+const div=(cls,ch,st)=>{const e=el('div',{class:cls||''},ch);if(st)Object.assign(e.style,st);return e;};
+
+// ── UI COMPONENTS ─────────────────────────────────────────────────
+function GC(title,icon,acc,bodyFn,badge){
+  const w=div('gc fi');w.style.borderColor=acc||T.border;
+  const h=div('gh',[el('span',{html:(icon?'<span style="font-size:13px;margin-right:6px">'+icon+'</span>':'')+title})],badge);
+  const b=div('gb');bodyFn(b);
+  w.appendChild(h);w.appendChild(b);return w;
+}
+function MC(label,val,unit,color,sub){
+  const e=div('mc');
+  e.style.borderLeft=`3px solid ${color||T.cyan}`;
+  e.style.borderColor=`${color||T.cyan}22`;
+  e.innerHTML=`<div class="l">${label}</div><div class="v" style="color:${color||T.cyan}">${val}</div>${unit?`<div class="u">${unit}</div>`:''}${sub?`<div class="s" style="color:${color||T.cyan}">${sub}</div>`:''}`;
+  return e;
+}
+function MR(...ms){const r=div('mr');ms.forEach(m=>r.appendChild(m));return r;}
+function BD(lbl,c,b){const e=el('span',{class:'bd'},lbl);e.style.color=c||T.cyan;e.style.background=b||T.cd;e.style.borderColor=`${c||T.cyan}30`;return e;}
+function NB(val,max,c){
+  const p=max>0?Math.min(val/max*100,100):0;
+  const t=div('nt');const f=div('nf');
+  f.style.cssText=`width:${p}%;background:${c||T.cyan};box-shadow:0 0 8px ${c||T.cyan}50`;
+  t.appendChild(f);return t;
+}
+function INP(lbl,type,val,cb,opts={}){
+  const w=div('fg');
+  if(lbl){w.appendChild(el('label',{},lbl));}
+  const i=el('input',{type:type||'text'});
+  i.value=val??'';if(opts.ph)i.placeholder=opts.ph;if(opts.w)i.style.width=opts.w;
+  i.oninput=e=>cb(e.target.value);w.appendChild(i);return w;
+}
+function SEL(lbl,options,val,cb){
+  const w=div('fg');
+  if(lbl)w.appendChild(el('label',{},lbl));
+  const s=el('select',{});
+  options.forEach(o=>{const op=el('option',{value:o.v??o},o.l??o);if((o.v??o)===val)op.selected=true;s.appendChild(op);});
+  s.onchange=e=>cb(e.target.value);w.appendChild(s);return w;
+}
+function BTN(txt,cb,cls='bt-c',sm=false){
+  const b=el('button',{class:`bt ${cls}${sm?' bt-sm':''}`,html:txt});
+  b.onclick=cb;return b;
+}
+function FR(...ch){const r=div('fr');ch.filter(Boolean).forEach(c=>r.appendChild(c));return r;}
+function InfoBox(html,color){
+  const e=div('info-box');
+  e.style.background=`${color||T.cyan}0F`;
+  e.style.border=`1px solid ${color||T.cyan}25`;
+  e.innerHTML=html;return e;
+}
+
+// ════════════════════════════════════════════════════════════════
+// ROLE SELECT
+// ════════════════════════════════════════════════════════════════
+function roleSelect(){
+  const w=div('role-wrap fi');
+  const imgEl=el('img',{src:`data:image/jpeg;base64,${LOGO}`,alt:'KST',style:{height:'68px',marginBottom:'13px',filter:'drop-shadow(0 0 16px rgba(0,229,255,0.35))'}});
+  const hdr=div('',[
+    imgEl,
+    el('div',{style:{fontFamily:"'Space Grotesk',sans-serif",color:T.silver,fontSize:'20px',fontWeight:'700',textAlign:'center',marginBottom:'4px'}},'KST Collaborative Hub'),
+    el('div',{style:{color:T.cyan,fontSize:'9.5px',fontWeight:'700',letterSpacing:'1.2px',textTransform:'uppercase',textAlign:'center',marginBottom:'5px'}},'REAL-TIME · MULTI-DEPARTMENT · BRANCH KH'),
+    el('div',{style:{color:T.slate,fontSize:'11px',textAlign:'center',marginBottom:'10px'}},'ห้องเย็นโชติวัฒน์หาดใหญ่ จำกัด (มหาชน)'),
+    el('div',{style:{textAlign:'center',marginBottom:'24px'}},[
+      el('span',{style:{display:'inline-block',padding:'3px 13px',background:T.cd,border:`1px solid rgba(0,229,255,0.3)`,borderRadius:'18px',color:T.cyan,fontSize:'9px',fontWeight:'700',fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'.4px'}},'by TORSAK ARUNPAN — AI Strategist & Tech Advisor'),
+    ]),
+  ],{textAlign:'center',marginBottom:'24px'});
+  w.appendChild(hdr);
+  const g=div('role-grid');
+  ROLES.forEach(r=>{
+    const c=div('role-card',[
+      el('div',{style:{fontSize:'24px',marginBottom:'6px'}},r.e),
+      el('div',{style:{color:T.silver,fontWeight:'700',fontSize:'12px',fontFamily:"'Space Grotesk',sans-serif"}},r.l),
+      el('div',{style:{color:T.slate,fontSize:'9px',marginTop:'2px'}},r.s),
+    ]);
+    c.addEventListener('mouseenter',()=>{c.style.background=r.b;c.style.borderColor=r.c+'50';c.style.boxShadow=`0 0 24px ${r.c}20`});
+    c.addEventListener('mouseleave',()=>{c.style.background='';c.style.borderColor='';c.style.boxShadow='';});
+    c.onclick=()=>{S.role=r.id;render();};
+    g.appendChild(c);
+  });
+  w.appendChild(g);
+  w.appendChild(el('div',{style:{color:T.slate,fontSize:'9px',textAlign:'center',marginTop:'20px',fontFamily:"'Space Grotesk',sans-serif"}},'"Think Structured. Build Smart."'));
+  return w;
+}
+
+// ════════════════════════════════════════════════════════════════
+// HEADER + STATUS
+// ════════════════════════════════════════════════════════════════
+function renderHeader(){
+  const r=ROLES.find(x=>x.id===S.role);
+  const h=el('div',{class:'topbar'});
+  // Left
+  const left=el('div',{style:{display:'flex',alignItems:'center',gap:'11px'}});
+  left.appendChild(el('img',{src:`data:image/jpeg;base64,${LOGO}`,alt:'KST',style:{height:'38px',filter:'drop-shadow(0 0 7px rgba(0,229,255,0.3))'}}));
+  left.appendChild(el('div',{html:`<div style="font-family:'Space Grotesk',sans-serif;color:${T.silver};font-size:14px;font-weight:700;letter-spacing:.3px">KST Collaborative Hub</div><div style="color:${T.slate};font-size:8px;letter-spacing:.6px;text-transform:uppercase">Branch KH · FW PD SK 900G · Torsak Arunpan</div>`}));
+  left.appendChild(el('div',{style:{background:r.b,border:`1px solid ${r.c}40`,borderRadius:'18px',padding:'3px 10px',display:'flex',alignItems:'center',gap:'5px'}},[
+    el('span',{style:{fontSize:'12px'}},r.e),
+    el('span',{style:{color:r.c,fontWeight:'700',fontSize:'10px',fontFamily:"'Space Grotesk',sans-serif"}},r.l),
+    el('span',{class:'dot pu',style:{background:r.c,boxShadow:`0 0 4px ${r.c}`}}),
+  ]));
+  // Right
+  const right=el('div',{style:{display:'flex',alignItems:'center',gap:'7px'}});
+  right.appendChild(el('div',{id:'connStatus',class:'connecting'},[
+    el('span',{class:'conn-dot pu'}),
+    el('span',{class:'conn-label'},'CONNECTING...'),
+  ]));
+  right.appendChild(el('div',{style:{color:T.slate,fontSize:'8.5px',textAlign:'right',fontFamily:"'JetBrains Mono',monospace"},html:`<div>LAST SYNC</div><div id="syncTime" style="color:${T.cyan}">${S.lastSync?S.lastSync.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—'}</div>`}));
+  right.appendChild(el('button',{class:'bt bt-g bt-sm',onclick:()=>{document.getElementById('setupOverlay').style.display='flex';}},'⚙ Config'));
+  right.appendChild(el('button',{class:'bt bt-g bt-sm',onclick:()=>{S.role=null;render();}},'เปลี่ยนฝ่าย'));
+  h.appendChild(left);h.appendChild(right);
+  return h;
+}
+
+function renderStatusBar(){
+  const d=S.data;
+  const bar=el('div',{class:'statusbar'});
+  bar.appendChild(el('span',{style:{color:T.slate,fontSize:'8px',fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'.8px'}},'LIVE'));
+  ROLES.filter(r=>r.id!=='management').forEach(r=>{
+    const has={planning:d.orders.length>0,procurement:d.pos.length>0,production:d.actuals.length>0,qc:d.qc.length>0,sales:d.shipments.filter(s=>s.containerNo).length>0}[r.id];
+    const p=el('div',{class:'dp',style:{background:has?r.b:'transparent',border:`1px solid ${has?r.c+'40':T.border}`}});
+    p.appendChild(el('span',{class:'dot',style:{background:has?r.c:T.slate,boxShadow:has?`0 0 4px ${r.c}`:''}}));
+    p.appendChild(el('span',{style:{fontSize:'9px',fontWeight:'600',color:has?r.c:T.slate,fontFamily:"'Space Grotesk',sans-serif"}},r.l));
+    bar.appendChild(p);
+  });
+  bar.appendChild(el('span',{style:{marginLeft:'auto',color:T.slate,fontSize:'8px',fontFamily:"'JetBrains Mono',monospace"}},`ORD:${d.orders.length} PO:${d.pos.length} FG:${d.actuals.length} QC:${d.qc.length} SHP:${d.shipments.filter(s=>s.containerNo).length}`));
+  return bar;
+}
+
+// ════════════════════════════════════════════════════════════════
+// PLANNING VIEW
+// ════════════════════════════════════════════════════════════════
+function planningV(){
+  const d=S.data;
+  const sp=()=>spv(S.pf.sz);
+  const fgKg=()=>(S.pf.ct||0)*KGC;
+  const rmKg=()=>fgKg()/sp().y;
+  const revThb=()=>fgKg()*(parseFloat(S.pf.pr)||sp().u)*FX*2.20462;
+  const beRm=()=>((parseFloat(S.pf.pr)||sp().u)*FX*2.20462-sp().p)*sp().y;
+  const totFg=d.orders.reduce((a,o)=>a+o.kgFg,0);
+  const totRm=d.orders.reduce((a,o)=>a+o.kgRm,0);
+  const totRev=d.orders.reduce((a,o)=>a+o.revThb,0);
+  const todTgt=d.targets.find(t=>t.date===today())?.fgKg||0;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('FG PLAN',fmt(totFg),'kg','#7B61FF',`${d.orders.length} orders`),
+    MC('RM REQUIRED',fmt(totRm),'kg RM',T.warn),
+    MC('REVENUE PLAN','฿'+fmt(Math.round(totRev/1000))+'K','THB',T.ok),
+    MC('DAILY TARGET',fmt(todTgt),'kg FG/day',T.cyan,today()),
+  ));
+
+  let prevEl;
+  const upPrev=()=>{if(!prevEl)return;prevEl.innerHTML=`
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">FG (kg)</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.silver}">${fmt(fgKg(),0)}</div></div>
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">RM Required</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.warn}">${fmt(rmKg(),0)} kg</div></div>
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">Revenue</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.ok}">฿${fmt(Math.round(revThb()/1000))}K</div></div>
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">Yield</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.cyan}">${pct(sp().y*100)}</div></div>
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">Std Cost ฿/FG</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.slate}">฿${sp().s}</div></div>
+    <div><div style="color:${T.slate};font-size:8px;text-transform:uppercase;letter-spacing:.5px">BE RM ฿/kg</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#7B61FF">${beRm().toFixed(2)}</div></div>`;};
+
+  const g=div('g2');
+  g.appendChild(GC('ADD SALES ORDER','📋','rgba(123,97,255,0.35)',b=>{
+    prevEl=el('div',{style:{background:'rgba(123,97,255,0.08)',border:'1px solid rgba(123,97,255,0.25)',borderRadius:'10px',padding:'10px 12px',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'7px',marginBottom:'10px'}});
+    upPrev();
+    b.appendChild(FR(
+      SEL('Size FG',SIZES.map(s=>({v:s,l:s})),S.pf.sz,v=>{S.pf.sz=v;upPrev();}),
+      INP('Cartons','number',S.pf.ct,v=>{S.pf.ct=+v;upPrev();},{w:'75px'}),
+      INP('Price USD/lb','number',S.pf.pr,v=>{S.pf.pr=v;upPrev();},{w:'82px',ph:sp().u}),
+    ));
+    b.appendChild(prevEl);
+    const ab=BTN('+ Add Order',async()=>{
+      ab.disabled=true;ab.innerHTML='<span class="spin">↻</span> Saving...';
+      const o={id:uid(),size:S.pf.sz,cartons:+S.pf.ct,kgFg:Math.round(fgKg()),kgRm:Math.round(rmKg()),priceUsd:parseFloat(S.pf.pr)||sp().u,revThb:Math.round(revThb()),beRm:+beRm().toFixed(2),note:S.pf.note,createdAt:Date.now()};
+      await fbSet('orders',o);
+      fbNotif('planning',`New Order: ${S.pf.sz} × ${S.pf.ct} cartons → ${fmt(fgKg(),0)} kg FG`,'info');
+      S.pf={...S.pf,note:''}; // reset note
+    },'bt-v');
+    b.appendChild(FR(
+      INP('Note','text',S.pf.note,v=>{S.pf.note=v;},{w:'175px',ph:'เช่น Korea WO-18'}),
+      ab,
+    ));
+  }));
+
+  g.appendChild(GC('DAILY TARGET','🎯','rgba(0,229,255,0.22)',b=>{
+    b.appendChild(FR(
+      INP('Date','date',S.tf.dt,v=>{S.tf.dt=v;}),
+      INP('FG kg/day','number',S.tf.fg,v=>{S.tf.fg=+v;},{w:'105px'}),
+      INP('Note','text',S.tf.note,v=>{S.tf.note=v;},{w:'100px'}),
+    ));
+    b.appendChild(InfoBox(`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"><div><div style="color:${T.slate};font-size:8px">RM Input/Day</div><div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${T.warn}">${fmt(S.tf.fg/0.645,0)} kg</div></div><div><div style="color:${T.slate};font-size:8px">Wastewater</div><div style="font-weight:700;color:${S.tf.fg/0.645>25000?T.err:T.ok}">${S.tf.fg/0.645>25000?'⚠ OVER LIMIT':'✓ SAFE'}</div></div></div>`,T.cyan));
+    b.appendChild(BTN('💾 Save Target',async()=>{
+      const t={id:'tgt_'+S.tf.dt,date:S.tf.dt,fgKg:+S.tf.fg,rmKg:Math.round(S.tf.fg/0.645),note:S.tf.note,createdAt:Date.now()};
+      await db.ref(`${DB_PATH}/targets/${t.id}`).set(t);
+      fbNotif('planning',`Target ${S.tf.dt}: ${fmt(S.tf.fg)} kg FG/day`,'success');
+    },'bt-c'));
+    if(d.targets.length){
+      b.appendChild(el('hr',{class:'dv'}));
+      b.appendChild(el('div',{style:{fontSize:'8.5px',color:T.slate,fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'.5px',marginBottom:'7px'}},'RECENT TARGETS'));
+      d.targets.slice(-4).reverse().forEach(t=>{
+        b.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:`1px solid ${T.border}`,fontSize:'11px'},html:`<span style="font-family:'JetBrains Mono',monospace;color:${T.slate}">${t.date}</span><span style="font-weight:700;color:${T.cyan}">${fmt(t.fgKg)} kg</span><span style="color:${T.slate}">${t.note||'—'}</span>`}));
+      });
+    }
+  }));
+  frag.appendChild(g);
+
+  frag.appendChild(GC('SALES ORDERS','📋','rgba(123,97,255,0.3)',b=>{
+    if(!d.orders.length){b.appendChild(el('div',{style:{textAlign:'center',padding:'20px',color:T.slate}},'— no orders yet —'));return;}
+    const tw=div('tw');const tbl=el('table',{});
+    tbl.innerHTML=`<thead><tr><th>SIZE</th><th class="r">CARTONS</th><th class="r">FG kg</th><th class="r">RM kg</th><th class="r">USD/lb</th><th class="r">REVENUE ฿</th><th class="r">BE RM ฿</th><th>NOTE</th><th></th></tr></thead>`;
+    const tb=el('tbody',{});
+    d.orders.forEach(o=>{
+      const tr=el('tr',{});
+      tr.innerHTML=`<td><b style="color:${T.cyan}">${o.size}</b></td><td class="r">${o.cartons}</td><td class="r">${fmt(o.kgFg)}</td><td class="r" style="color:${T.warn}">${fmt(o.kgRm)}</td><td class="r">${(o.priceUsd||0).toFixed(2)}</td><td class="r" style="color:${T.ok}">${fmt(o.revThb)}</td><td class="r" style="color:#7B61FF">${(o.beRm||0).toFixed(2)}</td><td style="color:${T.slate};font-size:10px">${o.note||'—'}</td>`;
+      const td=el('td',{});const db2=el('button',{style:{background:'none',border:'none',color:T.err,cursor:'pointer',fontSize:'14px'}},'✕');
+      db2.onclick=async()=>{await fbDelete('orders',o.id);};
+      td.appendChild(db2);tr.appendChild(td);tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);tw.appendChild(tbl);b.appendChild(tw);
+    b.appendChild(el('div',{style:{fontSize:'11px',color:T.slate,marginTop:'7px',fontFamily:"'JetBrains Mono',monospace"},html:`FG: <b style="color:${T.cyan}">${fmt(totFg)} kg</b> &nbsp; RM: <b style="color:${T.warn}">${fmt(totRm)} kg</b> &nbsp; Rev: <b style="color:${T.ok}">฿${fmt(Math.round(totRev/1000))}K</b>`}));
+  },BD(`${d.orders.length} orders`,T.violet,T.vd)));
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// PROCUREMENT VIEW
+// ════════════════════════════════════════════════════════════════
+function procurementV(){
+  const d=S.data;
+  const totRmPlan=d.orders.reduce((a,o)=>a+o.kgRm,0);
+  const totPo=d.pos.filter(p=>p.status!=='cancelled').reduce((a,p)=>a+p.qty,0);
+  const totRec=d.pos.filter(p=>p.status==='received').reduce((a,p)=>a+p.qty,0);
+  const totCost=d.pos.reduce((a,p)=>a+(p.qty||0)*(p.price||0),0);
+  const cov=totRmPlan>0?(totPo/totRmPlan)*100:0;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('RM PLAN',fmt(totRmPlan),'kg (from Orders)',T.violet),
+    MC('PO COMMITTED',fmt(totPo),'kg',T.warn,`Coverage ${pct(cov)}`),
+    MC('RECEIVED',fmt(totRec),'kg',T.ok),
+    MC('RM COST','฿'+fmt(Math.round(totCost/1000))+'K','THB',T.err),
+  ));
+  // Coverage overall
+  frag.appendChild(GC('RM COVERAGE','📊','rgba(255,184,0,0.3)',b=>{
+    b.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'12px',marginBottom:'5px'},html:`<span style="font-weight:700">Overall Coverage</span><span style="font-family:'JetBrains Mono',monospace;color:${cov>=100?T.ok:T.warn}">${pct(cov)}</span>`}));
+    b.appendChild(NB(totPo,totRmPlan,cov>=100?T.ok:T.warn));
+    // Per size
+    SIZES.forEach(size=>{
+      const ordKg=d.orders.filter(o=>o.size===size).reduce((a,o)=>a+o.kgRm,0);
+      if(!ordKg)return;
+      const poKg=d.pos.filter(p=>p.size===size&&p.status!=='cancelled').reduce((a,p)=>a+p.qty,0);
+      const cv2=ordKg>0?(poKg/ordKg)*100:0;
+      b.appendChild(el('div',{style:{marginBottom:'7px'}},[
+        el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'11px',marginBottom:'2px'},html:`<span style="font-weight:600">${size}</span><span style="font-family:'JetBrains Mono',monospace;color:${cv2>=100?T.ok:T.warn};font-size:10px">${fmt(poKg)}/${fmt(ordKg)} kg (${pct(cv2)})</span>`}),
+        NB(poKg,ordKg,cv2>=100?T.ok:cv2>=70?T.warn:T.err),
+      ]));
+    });
+  }));
+  const g=div('g2');
+  g.appendChild(GC('ADD PURCHASE ORDER','🛒','rgba(255,184,0,0.3)',b=>{
+    b.appendChild(FR(
+      INP('Farm / Supplier','text',S.pof.farm,v=>{S.pof.farm=v;},{w:'145px',ph:'เช่น 6CQK, เต็มซีฟู้ด'}),
+      SEL('RM Size',SIZES.map(s=>({v:s,l:`${s} (${spv(s).rm} ตัว/กก.)`})),S.pof.sz,v=>{S.pof.sz=v;}),
+    ));
+    b.appendChild(FR(
+      INP('Qty (kg RM)','number',S.pof.qty,v=>{S.pof.qty=v;},{w:'100px'}),
+      INP('ราคา ฿/kg','number',S.pof.pr,v=>{S.pof.pr=v;},{w:'85px'}),
+      INP('PO Date','date',S.pof.dt,v=>{S.pof.dt=v;}),
+    ));
+    if(S.pof.qty&&S.pof.pr) b.appendChild(InfoBox(`Cost: <b style="font-family:'JetBrains Mono',monospace;color:${T.warn}">฿${fmt(S.pof.qty*S.pof.pr)}</b>`,T.warn));
+    b.appendChild(FR(
+      SEL('Status',['pending','confirmed','received','cancelled'].map(s=>({v:s,l:s})),S.pof.status,v=>{S.pof.status=v;}),
+      BTN('+ Add PO',async()=>{
+        if(!S.pof.farm||!S.pof.qty||!S.pof.pr){alert('กรุณากรอก Farm, Qty, Price');return;}
+        const po={id:uid(),farm:S.pof.farm,size:S.pof.sz,qty:+S.pof.qty,price:+S.pof.pr,cost:Math.round(S.pof.qty*S.pof.pr),poDate:S.pof.dt,status:S.pof.status,createdAt:Date.now()};
+        await fbSet('pos',po);
+        fbNotif('procurement',`PO: ${S.pof.farm} — ${fmt(S.pof.qty)} kg (${S.pof.sz}) ฿${S.pof.pr}/kg`,'info');
+        S.pof={...S.pof,farm:'',qty:'',pr:''};
+      },'bt-w'),
+    ));
+  }));
+  g.appendChild(GC('PO LOG','📋','rgba(255,184,0,0.3)',b=>{
+    if(!d.pos.length){b.appendChild(el('div',{style:{color:T.slate,textAlign:'center',padding:'18px'}},'— no POs yet —'));return;}
+    const tw=div('tw');const tbl=el('table',{});
+    tbl.innerHTML=`<thead><tr><th>FARM</th><th>SIZE</th><th class="r">QTY kg</th><th class="r">฿/kg</th><th class="r">COST ฿</th><th>DATE</th><th>STATUS</th><th></th></tr></thead>`;
+    const tb=el('tbody',{});
+    const sc={confirmed:T.cyan,received:T.ok,pending:T.warn,cancelled:T.err};
+    d.pos.forEach(p=>{
+      const tr=el('tr',{});
+      const c=sc[p.status]||T.slate;
+      tr.innerHTML=`<td><b>${p.farm}</b></td><td>${p.size}</td><td class="r">${fmt(p.qty)}</td><td class="r">${(p.price||0).toFixed(2)}</td><td class="r" style="color:${T.warn}">${fmt(p.cost)}</td><td>${p.poDate}</td><td><span class="bd" style="color:${c};background:${c}18;border-color:${c}30">${p.status}</span></td>`;
+      const td=el('td',{style:{display:'flex',gap:'4px'}});
+      if(p.status!=='received'){const rb=BTN('✓',async()=>{await fbUpdate('pos',p.id,{status:'received'});fbNotif('procurement',`รับ RM: ${p.farm} ${fmt(p.qty)} kg`,'success');},'bt-ok bt-sm');td.appendChild(rb);}
+      if(p.status!=='cancelled'){const cb=BTN('✕',async()=>{await fbUpdate('pos',p.id,{status:'cancelled'});},'bt-e bt-sm');td.appendChild(cb);}
+      tr.appendChild(td);tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);tw.appendChild(tbl);b.appendChild(tw);
+  },BD(`${d.pos.length} POs`,T.warn,'rgba(255,184,0,0.12)')));
+  frag.appendChild(g);
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// PRODUCTION VIEW
+// ════════════════════════════════════════════════════════════════
+function productionV(){
+  const d=S.data;
+  const totFgPlan=d.orders.reduce((a,o)=>a+o.kgFg,0);
+  const totFgAct=d.actuals.reduce((a,x)=>a+x.fgKg,0);
+  const totRmUsed=d.actuals.reduce((a,x)=>a+x.rmKg,0);
+  const avgY=totRmUsed>0?(totFgAct/totRmUsed)*100:0;
+  const todTgt=d.targets.find(t=>t.date===today())?.fgKg||0;
+  const todAct=d.actuals.filter(a=>a.date===today()).reduce((a,x)=>a+x.fgKg,0);
+  const sp=spv(S.prd.sz);
+  const autoRm=S.prd.fg?(S.prd.fg/sp.y).toFixed(0):'';
+  const actY=(S.prd.fg&&S.prd.rm)?(S.prd.fg/S.prd.rm*100).toFixed(1):null;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('TODAY FG',fmt(todAct),`Target: ${fmt(todTgt)} kg`,T.cyan,todTgt?pct(todAct/todTgt*100)+' of target':'no target'),
+    MC('FG CUMULATIVE',fmt(totFgAct),'kg',T.violet,totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),
+    MC('RM USED',fmt(totRmUsed),'kg',T.warn),
+    MC('AVG YIELD',pct(avgY),'overall',avgY>=64?T.ok:avgY>=60?T.warn:T.err),
+  ));
+  if(todTgt>0){
+    frag.appendChild(GC('TODAY PROGRESS','📈','rgba(0,229,255,0.2)',b=>{
+      b.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'12px',marginBottom:'5px'},html:`<span style="font-weight:700">${today()}</span><span style="font-family:'JetBrains Mono',monospace;color:${T.cyan}">${fmt(todAct)} / ${fmt(todTgt)} kg</span>`}));
+      b.appendChild(NB(todAct,todTgt,todAct>=todTgt?T.ok:T.cyan));
+    }));
+  }
+  const g=div('g2');
+  g.appendChild(GC('RECORD DAILY ACTUAL','🏭','rgba(0,229,255,0.25)',b=>{
+    b.appendChild(FR(
+      INP('Date','date',S.prd.dt,v=>{S.prd.dt=v;}),
+      SEL('Size FG',SIZES.map(s=>({v:s,l:s})),S.prd.sz,v=>{S.prd.sz=v;}),
+      SEL('Shift',['A','B','C'].map(s=>({v:s,l:'Shift '+s})),S.prd.shift,v=>{S.prd.shift=v;}),
+    ));
+    b.appendChild(FR(
+      INP('FG ได้ (kg)','number',S.prd.fg,v=>{S.prd.fg=+v;},{w:'105px'}),
+      INP('RM ใช้ (kg)','number',S.prd.rm,v=>{S.prd.rm=+v;},{w:'105px',ph:autoRm?`auto: ${autoRm}`:''}),
+      INP('MHR','number',S.prd.mhr,v=>{S.prd.mhr=+v;},{w:'75px',ph:'man-hrs'}),
+    ));
+    if(actY){
+      const yc=parseFloat(actY)>=64?T.ok:T.warn;
+      b.appendChild(InfoBox(`Yield จริง: <b style="font-family:'JetBrains Mono',monospace;color:${yc}">${actY}%</b> <span style="color:${T.slate}">(Std: ${pct(sp.y*100)})</span> &nbsp; OH: <b style="font-family:'JetBrains Mono',monospace">฿${fmt(S.prd.fg*sp.p)}</b>`,yc));
+    }
+    b.appendChild(BTN('+ บันทึกผลผลิต',async()=>{
+      if(!S.prd.fg){alert('กรุณากรอก FG kg');return;}
+      const rmU=+(S.prd.rm||autoRm);
+      const act={id:uid(),date:S.prd.dt,size:S.prd.sz,fgKg:+S.prd.fg,rmKg:rmU,yield:+(S.prd.fg/rmU*100).toFixed(1),mhr:+S.prd.mhr||0,shift:S.prd.shift,ohCost:Math.round(S.prd.fg*sp.p),createdAt:Date.now()};
+      await fbSet('actuals',act);
+      // auto-create QC batch
+      const qb={id:'qc_'+uid(),prodId:act.id,date:S.prd.dt,size:S.prd.sz,fgKg:+S.prd.fg,gradeA:0,gradeB:0,gradeC:0,gradeD:0,gradeBK:0,defectPct:0,status:'pending',createdAt:Date.now()};
+      await fbSet('qc',qb);
+      fbNotif('production',`Produced ${S.prd.dt}: ${S.prd.sz} — ${fmt(S.prd.fg)} kg FG (yield ${pct(act.yield)})`,'info');
+      S.prd={...S.prd,fg:'',rm:'',mhr:''};
+    },'bt-c'));
+    b.appendChild(el('div',{style:{fontSize:'9px',color:T.slate,marginTop:'5px'}},'* ระบบสร้าง QC Batch อัตโนมัติเมื่อบันทึก'));
+  }));
+  // Spec ref
+  g.appendChild(GC('SPEC REFERENCE FM-PN-12','📊','rgba(0,229,255,0.25)',b=>{
+    const tw=div('tw');const tbl=el('table',{});
+    tbl.innerHTML=`<thead><tr><th>SIZE</th><th>RM SIZE</th><th class="r">YIELD %</th><th class="r">PROC ฿</th><th class="r">STD COST</th></tr></thead>`;
+    const tb=el('tbody',{});
+    SIZES.forEach(s=>{
+      const sp2=SPEC[s];const isSel=s===S.prd.sz;
+      const tr=el('tr',{style:{background:isSel?'rgba(0,229,255,0.06)':'transparent'}});
+      tr.innerHTML=`<td><b style="color:${isSel?T.cyan:T.silver}">${s}</b></td><td style="color:${T.slate}">${sp2.rm}</td><td class="r">${pct(sp2.y*100)}</td><td class="r">${sp2.p}</td><td class="r" style="font-weight:700">${sp2.s}</td>`;
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);tw.appendChild(tbl);b.appendChild(tw);
+  }));
+  frag.appendChild(g);
+  // Actuals table
+  frag.appendChild(GC('PRODUCTION ACTUALS','📋','rgba(0,229,255,0.25)',b=>{
+    if(!d.actuals.length){b.appendChild(el('div',{style:{textAlign:'center',padding:'16px',color:T.slate}},'— no production data yet —'));return;}
+    const tw=div('tw');const tbl=el('table',{});
+    tbl.innerHTML=`<thead><tr><th>DATE</th><th>SIZE</th><th>SHIFT</th><th class="r">FG kg</th><th class="r">RM kg</th><th class="r">YIELD</th><th class="r">MHR</th><th class="r">OH ฿</th><th>QC</th></tr></thead>`;
+    const tb=el('tbody',{});
+    [...d.actuals].sort((a,b)=>b.createdAt-a.createdAt).forEach(a=>{
+      const q=d.qc.find(q=>q.prodId===a.id);
+      const yc=a.yield>=64?T.ok:a.yield>=60?T.warn:T.err;
+      const qs=q?q.status:'—';const qc={approved:T.ok,hold:T.err,pending:T.warn}[qs]||T.slate;
+      const tr=el('tr',{});
+      tr.innerHTML=`<td>${a.date}</td><td><b style="color:${T.cyan}">${a.size}</b></td><td>${a.shift}</td><td class="r">${fmt(a.fgKg)}</td><td class="r" style="color:${T.warn}">${fmt(a.rmKg)}</td><td class="r" style="color:${yc}">${pct(a.yield)}</td><td class="r">${a.mhr||'—'}</td><td class="r">${fmt(a.ohCost)}</td><td><span class="bd" style="color:${qc};background:${qc}18;border-color:${qc}30">${qs}</span></td>`;
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);tw.appendChild(tbl);b.appendChild(tw);
+  },BD(`${d.actuals.length} batches`,T.cyan,T.cd)));
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// QC VIEW
+// ════════════════════════════════════════════════════════════════
+function qcV(){
+  const d=S.data;
+  const pending=d.qc.filter(q=>q.status==='pending');
+  const approved=d.qc.filter(q=>q.status==='approved');
+  const onHold=d.qc.filter(q=>q.status==='hold');
+  const avgA=approved.length>0?approved.reduce((a,q)=>a+(q.gradeA||0),0)/approved.length:0;
+  const tot=+S.gr.a+ +S.gr.b+ +S.gr.c+ +S.gr.d+ +S.gr.bk;
+  const valid=Math.abs(tot-100)<1;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('PENDING QC',pending.length,'batches',T.warn),
+    MC('APPROVED',approved.length,'batches',T.ok),
+    MC('ON HOLD',onHold.length,'batches',T.err),
+    MC('AVG %A',pct(avgA),'grade A',avgA>=63?T.ok:avgA>=55?T.warn:T.err),
+  ));
+  const g=div('g2');
+  // Batch list
+  g.appendChild(GC('QC BATCH QUEUE','🔬','rgba(0,214,143,0.35)',b=>{
+    if(!d.qc.length){b.appendChild(el('div',{style:{color:T.slate,textAlign:'center',padding:'20px'}},'ยังไม่มี Batch จาก Production'));return;}
+    [...d.qc].sort((a,b)=>b.createdAt-a.createdAt).forEach(q=>{
+      const isSel=S.selBatch===q.id;
+      const sc={approved:T.ok,hold:T.err,pending:T.warn}[q.status]||T.slate;
+      const item=el('div',{class:`bi${isSel?' sel':''}`});
+      item.appendChild(el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},[
+        el('div',{html:`<b style="font-size:12px">${q.date}</b><span style="margin-left:8px;color:${T.slate};font-size:11px">${q.size}</span><span style="margin-left:8px;font-family:'JetBrains Mono',monospace;font-size:11px">${fmt(q.fgKg)} kg</span>`}),
+        el('span',{class:'bd',style:{color:sc,background:`${sc}18`,borderColor:`${sc}30`}},q.status),
+      ]));
+      if(q.status!=='pending')item.appendChild(el('div',{style:{fontSize:'10px',color:T.slate,marginTop:'3px'}},`%A:${q.gradeA||0} %B:${q.gradeB||0} %C:${q.gradeC||0} %D:${q.gradeD||0} %BK:${q.gradeBK||0} Defect:${q.defectPct||0}%`));
+      if(q.status==='pending'){
+        item.appendChild(el('div',{style:{fontSize:'9px',color:isSel?T.ok:T.slate,marginTop:'2px'}},isSel?'✓ เลือกแล้ว':'คลิกเพื่อตรวจ QC'));
+        item.onclick=()=>{S.selBatch=isSel?null:q.id;render();};
+      }
+      b.appendChild(item);
+    });
+  }));
+  // Grade entry
+  const sel=d.qc.find(q=>q.id===S.selBatch);
+  g.appendChild(GC(sel?`GRADE — ${sel.date} ${sel.size}`:'เลือก Batch จากซ้าย','📊','rgba(0,214,143,0.35)',b=>{
+    if(!S.selBatch||!sel){b.appendChild(el('div',{style:{textAlign:'center',padding:'32px',color:T.slate}},'👆 คลิก Batch ที่ต้องการตรวจ QC'));return;}
+    b.appendChild(InfoBox(`<b>${sel.size}</b> · ${fmt(sel.fgKg)} kg FG`,T.ok));
+    const gr=div('',null,{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'10px'});
+    [['a','Grade A %',T.ok],['b','Grade B %',T.cyan],['c','Grade C %',T.warn],['d','Grade D %',T.err],['bk','BK %',T.slate],['def','Defect %',T.err]].forEach(([k,l,c])=>{
+      const fg=div('fg');
+      fg.appendChild(el('label',{style:{borderColor:c}},l));
+      const inp=el('input',{type:'number'});inp.value=S.gr[k]||0;
+      inp.style.borderColor=k==='a'?T.ok:T.border;
+      inp.oninput=e=>{S.gr[k]=+e.target.value;};
+      fg.appendChild(inp);gr.appendChild(fg);
+    });
+    b.appendChild(gr);
+    b.appendChild(InfoBox(`รวม Grade: <b style="font-family:'JetBrains Mono',monospace;color:${valid?T.ok:T.err}">${tot.toFixed(1)}%</b>${!valid?` <span style="color:${T.err}">(ต้องรวมได้ 100%)</span>`:' <span style="color:'+T.ok+'">✓</span>'}`,valid?T.ok:T.err));
+    b.appendChild(INP('หมายเหตุ QC','text',S.gr.notes,v=>{S.gr.notes=v;},{w:'100%',ph:'สังเกตการณ์ เช่น สีดี / แก้มดำ / กลิ่น'}));
+    b.appendChild(el('br',{}));
+    b.appendChild(FR(
+      BTN('✓ อนุมัติ',async()=>{
+        if(!valid){alert('Grade ต้องรวมได้ 100%');return;}
+        await fbUpdate('qc',sel.id,{gradeA:+S.gr.a,gradeB:+S.gr.b,gradeC:+S.gr.c,gradeD:+S.gr.d,gradeBK:+S.gr.bk,defectPct:+S.gr.def,qcNotes:S.gr.notes,status:'approved',qcDate:today()});
+        fbNotif('qc',`QC Approved: ${sel.date} ${sel.size} — %A: ${S.gr.a}%`,'success');
+        S.selBatch=null;S.gr={a:0,b:0,c:0,d:0,bk:0,def:0,notes:''};
+      },'bt-ok'),
+      BTN('⚠ Hold',async()=>{
+        await fbUpdate('qc',sel.id,{...S.gr,status:'hold',qcDate:today()});
+        fbNotif('qc',`QC HOLD: ${sel.date} ${sel.size}`,'warn');
+        S.selBatch=null;
+      },'bt-e'),
+    ));
+  }));
+  frag.appendChild(g);
+  // Summary table
+  frag.appendChild(GC('QC SUMMARY','📈','rgba(0,214,143,0.35)',b=>{
+    if(!d.qc.length){b.appendChild(el('div',{style:{textAlign:'center',padding:'16px',color:T.slate}},'— no QC data —'));return;}
+    const tw=div('tw');const tbl=el('table',{});
+    tbl.innerHTML=`<thead><tr><th>DATE</th><th>SIZE</th><th class="r">FG kg</th><th class="r">%A</th><th class="r">%B</th><th class="r">%C</th><th class="r">%D</th><th class="r">%BK</th><th class="r">DEFECT</th><th>QC DATE</th><th>STATUS</th></tr></thead>`;
+    const tb=el('tbody',{});
+    [...d.qc].sort((a,b)=>b.createdAt-a.createdAt).forEach(q=>{
+      const sc={approved:T.ok,hold:T.err,pending:T.warn}[q.status]||T.slate;
+      const tr=el('tr',{});
+      tr.innerHTML=`<td>${q.date}</td><td>${q.size}</td><td class="r">${fmt(q.fgKg)}</td><td class="r" style="color:${(q.gradeA||0)>=63?T.ok:T.warn}">${q.gradeA||'—'}</td><td class="r">${q.gradeB||'—'}</td><td class="r" style="color:${(q.gradeC||0)>20?T.err:T.silver}">${q.gradeC||'—'}</td><td class="r">${q.gradeD||'—'}</td><td class="r">${q.gradeBK||'—'}</td><td class="r" style="color:${(q.defectPct||0)>3?T.err:T.silver}">${q.defectPct||'—'}</td><td style="color:${T.slate};font-size:10px">${q.qcDate||'—'}</td><td><span class="bd" style="color:${sc};background:${sc}18;border-color:${sc}30">${q.status}</span></td>`;
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);tw.appendChild(tbl);b.appendChild(tw);
+  },BD(`${d.qc.length} batches`,T.ok,'rgba(0,214,143,0.12)')));
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// SALES VIEW
+// ════════════════════════════════════════════════════════════════
+function salesV(){
+  const d=S.data;
+  const inv=d.qc.filter(q=>q.status==='approved');
+  const totApp=inv.reduce((a,q)=>a+q.fgKg,0);
+  const ships=d.shipments.filter(s=>s.containerNo&&!s.isInventory);
+  const totShip=ships.reduce((a,s)=>a+(s.kgFg||s.kg||0),0);
+  const totRev=ships.reduce((a,s)=>a+(s.revThb||s.rev||0),0);
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('FG AVAILABLE',fmt(totApp),'kg QC Approved',T.ok),
+    MC('SHIPPED',fmt(totShip),'kg',T.org),
+    MC('REMAINING',fmt(Math.max(0,totApp-totShip)),'kg',totApp>totShip?T.warn:T.slate),
+    MC('REVENUE','฿'+fmt(Math.round(totRev/1000))+'K','realized',T.ok,`${ships.length} containers`),
+  ));
+  // Inventory cards
+  frag.appendChild(GC('FG INVENTORY — QC APPROVED','✅','rgba(0,214,143,0.35)',b=>{
+    if(!inv.length){b.appendChild(el('div',{style:{color:T.slate,fontSize:'12px'}},'รอ QC อนุมัติก่อน'));return;}
+    const row=el('div',{style:{display:'flex',flexWrap:'wrap',gap:'9px'}});
+    inv.forEach(q=>row.appendChild(el('div',{style:{background:'rgba(0,214,143,0.1)',border:`1px solid rgba(0,214,143,0.3)`,borderRadius:'10px',padding:'11px 14px',minWidth:'130px'},html:`<div style="font-weight:700;font-size:13px">${q.size}</div><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${T.ok}">${fmt(q.fgKg)} <span style="font-size:11px;font-weight:400">kg</span></div><div style="font-size:9px;color:${T.slate};margin-top:2px">${q.date} · %A: ${q.gradeA||0}%</div>`})));
+    b.appendChild(row);
+  }));
+  const g=div('g2');
+  g.appendChild(GC('RECORD SHIPMENT','📦','rgba(255,159,67,0.3)',b=>{
+    b.appendChild(FR(
+      INP('Customer','text',S.shf.cust,v=>{S.shf.cust=v;},{w:'145px',ph:'เช่น Korea WO-18'}),
+      INP('Container No.','text',S.shf.con,v=>{S.shf.con=v;},{w:'130px',ph:'ABCU1234567'}),
+    ));
+    b.appendChild(FR(
+      SEL('Size FG',SIZES.map(s=>({v:s,l:s})),S.shf.sz,v=>{S.shf.sz=v;}),
+      INP('FG (kg)','number',S.shf.kg,v=>{S.shf.kg=v;},{w:'95px'}),
+      INP('Price USD/lb','number',S.shf.pr,v=>{S.shf.pr=v;},{w:'85px',ph:(SPEC[S.shf.sz]?.u||'').toString()}),
+      INP('Ship Date','date',S.shf.dt,v=>{S.shf.dt=v;}),
+    ));
+    if(S.shf.kg){
+      const r2=Math.round(+S.shf.kg*(+S.shf.pr||spv(S.shf.sz).u)*FX*2.20462);
+      b.appendChild(InfoBox(`Revenue: <b style="font-family:'JetBrains Mono',monospace;color:${T.ok}">฿${fmt(r2)}</b>`,T.ok));
+    }
+    b.appendChild(BTN('📦 บันทึกการจัดส่ง',async()=>{
+      if(!S.shf.cust||!S.shf.kg){alert('กรุณากรอก Customer และ FG kg');return;}
+      const rev2=Math.round(+S.shf.kg*(+S.shf.pr||spv(S.shf.sz).u)*FX*2.20462);
+      const ship={id:uid(),isInventory:false,customer:S.shf.cust,containerNo:S.shf.con,size:S.shf.sz,kgFg:+S.shf.kg,priceUsd:+S.shf.pr||spv(S.shf.sz).u,revThb:rev2,shipDate:S.shf.dt,note:S.shf.note,status:'shipped',createdAt:Date.now()};
+      await fbSet('shipments',ship);
+      fbNotif('sales',`Shipped: ${S.shf.cust} — ${fmt(S.shf.kg)} kg ${S.shf.con||''}`,'success');
+      S.shf={...S.shf,cust:'',con:'',kg:'',pr:''};
+    },'bt-w'));
+  }));
+  g.appendChild(GC('SHIPMENT LOG','🚢','rgba(255,159,67,0.3)',b=>{
+    if(!ships.length){b.appendChild(el('div',{style:{color:T.slate,textAlign:'center',padding:'18px'}},'ยังไม่มีการจัดส่ง'));return;}
+    ships.forEach(s=>b.appendChild(el('div',{style:{padding:'8px 0',borderBottom:`1px solid ${T.border}`},html:`<div style="display:flex;justify-content:space-between"><b>${s.customer||s.cust}</b><span style="font-family:'JetBrains Mono',monospace;color:${T.org}">฿${fmt(Math.round((s.revThb||s.rev||0)/1000))}K</span></div><div style="color:${T.slate};font-size:10px;margin-top:2px">${s.size} · ${fmt(s.kgFg||s.kg)} kg · ${s.containerNo||s.con||'—'} · ${s.shipDate||s.dt}</div>`})));
+    b.appendChild(el('div',{style:{marginTop:'8px',padding:'6px 0',borderTop:`2px solid ${T.border}`,fontSize:'12px',fontWeight:'700'},html:`รวม: <span style="color:${T.org}">${fmt(totShip)} kg</span> · <span style="color:${T.ok}">฿${fmt(Math.round(totRev/1000))}K</span>`}));
+  }));
+  frag.appendChild(g);
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// MANAGEMENT VIEW
+// ════════════════════════════════════════════════════════════════
+function managementV(){
+  const d=S.data;
+  const totFgPlan=d.orders.reduce((a,o)=>a+o.kgFg,0);
+  const totRevPlan=d.orders.reduce((a,o)=>a+o.revThb,0);
+  const totRmPlan=d.orders.reduce((a,o)=>a+o.kgRm,0);
+  const totPo=d.pos.filter(p=>p.status!=='cancelled').reduce((a,p)=>a+p.qty,0);
+  const totRmCost=d.pos.reduce((a,p)=>a+(p.qty||0)*(p.price||0),0);
+  const totFgAct=d.actuals.reduce((a,x)=>a+x.fgKg,0);
+  const totOH=d.actuals.reduce((a,x)=>a+x.ohCost,0);
+  const approved=d.qc.filter(q=>q.status==='approved');
+  const totApp=approved.reduce((a,q)=>a+q.fgKg,0);
+  const ships=d.shipments.filter(s=>!s.isInventory&&s.containerNo);
+  const totShip=ships.reduce((a,s)=>a+(s.kgFg||s.kg||0),0);
+  const totRevR=ships.reduce((a,s)=>a+(s.revThb||s.rev||0),0);
+  const avgA=approved.length>0?approved.reduce((a,q)=>a+(q.gradeA||0),0)/approved.length:0;
+  const gp=totRevR-totRmCost-totOH;
+  const gpPct=totRevR>0?(gp/totRevR)*100:0;
+  const frag=document.createDocumentFragment();
+  frag.appendChild(MR(
+    MC('FG PLAN','฿'+fmt(Math.round(totRevPlan/1000))+'K',fmt(totFgPlan)+' kg',T.violet),
+    MC('FG PRODUCED',fmt(totFgAct),'kg',T.cyan,totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),
+    MC('QC APPROVED',fmt(totApp),'kg',T.ok,'%A avg: '+pct(avgA)),
+    MC('REVENUE','฿'+fmt(Math.round(totRevR/1000))+'K',fmt(totShip)+' kg shipped',T.warn),
+    MC('GROSS PROFIT','฿'+fmt(Math.round(gp/1000))+'K',pct(gpPct)+' GP%',gp>=0?T.ok:T.err),
+  ));
+  // P&L
+  frag.appendChild(GC('P&L WATERFALL','💰','rgba(0,229,255,0.28)',b=>{
+    const row=el('div',{style:{display:'flex',gap:'9px',flexWrap:'wrap'}});
+    [{l:'Revenue',v:totRevR,c:T.ok},{l:'RM Cost',v:-totRmCost,c:T.err},{l:'OH Cost',v:-totOH,c:T.warn},{l:'Gross Profit',v:gp,c:gp>=0?T.ok:T.err,bold:true}].forEach(item=>{
+      row.appendChild(el('div',{style:{flex:'1',minWidth:'95px',background:item.bold?T.cd:`${item.c}12`,border:`1px solid ${item.c}25`,borderRadius:'10px',padding:'11px 13px',textAlign:'center'},html:`<div style="font-size:8px;color:${T.slate};text-transform:uppercase;letter-spacing:.5px;font-family:'Space Grotesk',sans-serif;margin-bottom:3px">${item.l}</div><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${item.c}">${item.v>=0?'+':''}${fmt(Math.round(item.v/1000),0)}K ฿</div>${item.bold?`<div style="font-size:9px;color:${T.cyan};font-weight:700;margin-top:2px">${pct(gpPct)}</div>`:''}`}));
+    });
+    b.appendChild(row);
+  }));
+  const g=div('g2');
+  g.appendChild(GC('PRODUCTION PIPELINE','⚡','rgba(0,229,255,0.22)',b=>{
+    [{l:'📋 Orders',v:totFgPlan,max:totFgPlan,c:T.violet},{l:'🛒 RM Committed',v:totPo,max:totRmPlan,c:T.warn},{l:'🏭 FG Produced',v:totFgAct,max:totFgPlan,c:T.cyan},{l:'🔬 QC Approved',v:totApp,max:totFgAct,c:T.ok},{l:'📦 Shipped',v:totShip,max:totApp,c:T.org}].forEach(item=>{
+      const pv=item.max>0?Math.min(item.v/item.max*100,100):0;
+      b.appendChild(el('div',{style:{marginBottom:'9px'}},[
+        el('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'11px',marginBottom:'2px'},html:`<span style="font-weight:600">${item.l}</span><span style="font-family:'JetBrains Mono',monospace;color:${item.c};font-size:10px">${fmt(item.v)} kg · ${pct(pv)}</span>`}),
+        NB(item.v,item.max,item.c),
+      ]));
+    });
+  }));
+  // Activity feed
+  const notifs=[...(d.notifications||[])].sort((a,b)=>b.time-a.time).slice(0,12);
+  g.appendChild(GC('ACTIVITY FEED','🔔','rgba(0,229,255,0.22)',b=>{
+    if(!notifs.length){b.appendChild(el('div',{style:{color:T.slate,textAlign:'center',padding:'20px'}},'— no activity —'));return;}
+    const sc=el('div',{style:{maxHeight:'280px',overflowY:'auto'}});
+    notifs.forEach(n=>{
+      const r2=ROLES.find(x=>x.id===n.dept)||ROLES[0];
+      sc.appendChild(el('div',{style:{display:'flex',gap:'7px',padding:'7px 0',borderBottom:`1px solid ${T.border}`}},[
+        el('span',{style:{fontSize:'14px'}},r2.e),
+        el('div',{style:{flex:'1'},html:`<div style="font-size:11px;color:${T.silver}">${n.msg}</div><div style="font-size:8.5px;color:${T.slate};margin-top:1px;font-family:'Space Grotesk',sans-serif">${r2.l} · ${n.time?fmtTime(n.time):''}</div>`}),
+        BD(r2.s,r2.c,r2.b),
+      ]));
+    });
+    b.appendChild(sc);
+  },BD(notifs.length+' events',T.cyan,T.cd)));
+  frag.appendChild(g);
+  // Dept status
+  frag.appendChild(GC('DEPARTMENT STATUS','🏢','rgba(0,229,255,0.22)',b=>{
+    const dg=el('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'9px'}});
+    [{r:ROLES[0],c:d.orders.length,l:`${d.orders.length} orders · FG ${fmt(totFgPlan)} kg`},{r:ROLES[1],c:d.pos.length,l:`${d.pos.length} POs · ${pct(totRmPlan>0?totPo/totRmPlan*100:0)} covered`},{r:ROLES[2],c:d.actuals.length,l:`${d.actuals.length} batches · ${fmt(totFgAct)} kg`},{r:ROLES[3],c:d.qc.length,l:`${approved.length} approved · %A ${pct(avgA)}`},{r:ROLES[4],c:ships.length,l:`${fmt(totShip)} kg · ฿${fmt(Math.round(totRevR/1000))}K`}].forEach(({r,c,l})=>{
+      dg.appendChild(el('div',{style:{background:c>0?r.b:'transparent',border:`1px solid ${c>0?r.c+'30':T.border}`,borderRadius:'10px',padding:'11px 13px'},html:`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><span style="font-size:17px">${r.e}</span><div><div style="font-weight:700;font-size:11px;color:${c>0?r.c:T.slate};font-family:'Space Grotesk',sans-serif">${r.l}</div><div style="font-size:8.5px;color:${T.slate}">${r.s}</div></div><div style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:${c>0?r.c:T.border};box-shadow:${c>0?`0 0 5px ${r.c}`:'none'}"></div></div><div style="font-size:11px;color:${c>0?T.silver:T.slate}">${c>0?l:'— no data —'}</div>`}));
+    });
+    b.appendChild(dg);
+  }));
+  return frag;
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN RENDER
+// ════════════════════════════════════════════════════════════════
+const VIEWS={planning:planningV,procurement:procurementV,production:productionV,qc:qcV,sales:salesV,management:managementV};
+
+function render(){
+  const app=document.getElementById('app');
+  if(!app)return;
+  app.innerHTML='';
+  if(!S.role){app.appendChild(roleSelect());return;}
+  // Header
+  app.appendChild(renderHeader());
+  app.appendChild(renderStatusBar());
+  // Notif strip
+  const notifs=[...(S.data.notifications||[])].sort((a,b)=>b.time-a.time).slice(0,3);
+  if(notifs.length&&S.role!=='management'){
+    const strip=el('div',{class:'notif-strip'});
+    strip.appendChild(el('span',{style:{color:T.cyan,fontWeight:'700',fontSize:'8.5px',fontFamily:"'Space Grotesk',sans-serif",letterSpacing:'.8px',whiteSpace:'nowrap'}},'◉ LIVE'));
+    notifs.forEach(n=>{
+      const r2=ROLES.find(x=>x.id===n.dept)||ROLES[0];
+      strip.appendChild(el('span',{style:{fontSize:'11px',color:T.silver,whiteSpace:'nowrap'},html:`${r2.e} ${n.msg} <span style="color:${T.slate}">· ${n.time?fmtTime(n.time):''}</span>`}));
+    });
+    app.appendChild(strip);
+  }
+  // Main content
+  const main=el('div',{class:'main fi'});
+  const viewFn=VIEWS[S.role]||managementV;
+  main.appendChild(viewFn());
+  app.appendChild(main);
+  // Update sync time
+  const st=document.getElementById('syncTime');
+  if(st&&S.lastSync)st.textContent=S.lastSync.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded',()=>{
+  // Set logos
+  document.querySelectorAll('#setupLogo').forEach(img=>img.src=`data:image/jpeg;base64,${LOGO}`);
+  // Auto-init Firebase (config hardcoded)
+  initFirebase(FIREBASE_CONFIG);
+  render();
+});
+
+// Handle offline — show role select even without Firebase
+setTimeout(()=>{if(!db){console.warn('Firebase not initialized');render();}},1000);
+</script>
+</body>
+</html>
