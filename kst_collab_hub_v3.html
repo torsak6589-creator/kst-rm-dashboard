@@ -258,22 +258,20 @@ const DB_PATH='kst'; // Firebase root path
 // ── FIREBASE ─────────────────────────────────────────────────────
 let db=null, connected=false;
 
-function getConfig(){
-  try{ return JSON.parse(localStorage.getItem('kst_fb_config')||'null'); }
-  catch{ return null; }
-}
-function saveConfig(){
-  const cfg={
-    apiKey:document.getElementById('cfgApiKey').value.trim(),
-    authDomain:document.getElementById('cfgAuthDomain').value.trim(),
-    databaseURL:document.getElementById('cfgDbUrl').value.trim(),
-    projectId:document.getElementById('cfgProjectId').value.trim(),
-  };
-  if(!cfg.apiKey||!cfg.databaseURL){ alert('กรุณากรอก API Key และ Database URL'); return; }
-  localStorage.setItem('kst_fb_config', JSON.stringify(cfg));
-  document.getElementById('setupOverlay').style.display='none';
-  initFirebase(cfg);
-}
+// ── FIREBASE CONFIG (hardcoded) ──────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:           "AIzaSyA8pXNROEw0SDulku380KLjE4YHGoadyyQ",
+  authDomain:       "kst-collab.firebaseapp.com",
+  databaseURL:      "https://kst-collab-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:        "kst-collab",
+  storageBucket:    "kst-collab.firebasestorage.app",
+  messagingSenderId:"797075927152",
+  appId:            "1:797075927152:web:19b9600581cd1b15c744b5",
+  measurementId:    "G-Q0KH9DH06T"
+};
+
+function getConfig(){ return FIREBASE_CONFIG; }
+function saveConfig(){ /* not used — config is hardcoded */ }
 
 function initFirebase(cfg){
   try{
@@ -388,7 +386,7 @@ const div=(cls,ch,st)=>{const e=el('div',{class:cls||''},ch);if(st)Object.assign
 // ── UI COMPONENTS ─────────────────────────────────────────────────
 function GC(title,icon,acc,bodyFn,badge){
   const w=div('gc fi');w.style.borderColor=acc||T.border;
-  const h=div('gh',[el('span',{html:`${icon?`<span style="font-size:13px;margin-right:6px">${icon}</span>`:''}${title}`)},badge]);
+  const h=div('gh',[el('span',{html:(icon?'<span style="font-size:13px;margin-right:6px">'+icon+'</span>':'')+title})],badge);
   const b=div('gb');bodyFn(b);
   w.appendChild(h);w.appendChild(b);return w;
 }
@@ -476,11 +474,11 @@ function renderHeader(){
   const left=el('div',{style:{display:'flex',alignItems:'center',gap:'11px'}});
   left.appendChild(el('img',{src:`data:image/jpeg;base64,${LOGO}`,alt:'KST',style:{height:'38px',filter:'drop-shadow(0 0 7px rgba(0,229,255,0.3))'}}));
   left.appendChild(el('div',{html:`<div style="font-family:'Space Grotesk',sans-serif;color:${T.silver};font-size:14px;font-weight:700;letter-spacing:.3px">KST Collaborative Hub</div><div style="color:${T.slate};font-size:8px;letter-spacing:.6px;text-transform:uppercase">Branch KH · FW PD SK 900G · Torsak Arunpan</div>`}));
-  left.appendChild(el('div',{style:{background:r.b,border:`1px solid ${r.c}40`,borderRadius:'18px',padding:'3px 10px',display:'flex',alignItems:'center',gap:'5px'},[
+  left.appendChild(el('div',{style:{background:r.b,border:`1px solid ${r.c}40`,borderRadius:'18px',padding:'3px 10px',display:'flex',alignItems:'center',gap:'5px'}},[
     el('span',{style:{fontSize:'12px'}},r.e),
     el('span',{style:{color:r.c,fontWeight:'700',fontSize:'10px',fontFamily:"'Space Grotesk',sans-serif"}},r.l),
     el('span',{class:'dot pu',style:{background:r.c,boxShadow:`0 0 4px ${r.c}`}}),
-  ]}));
+  ]));
   // Right
   const right=el('div',{style:{display:'flex',alignItems:'center',gap:'7px'}});
   right.appendChild(el('div',{id:'connStatus',class:'connecting'},[
@@ -1028,15 +1026,9 @@ function render(){
 window.addEventListener('DOMContentLoaded',()=>{
   // Set logos
   document.querySelectorAll('#setupLogo').forEach(img=>img.src=`data:image/jpeg;base64,${LOGO}`);
-  // Check Firebase config
-  const cfg=getConfig();
-  if(cfg){
-    initFirebase(cfg);
-    render(); // show app immediately, Firebase subscribes in background
-  } else {
-    document.getElementById('setupOverlay').style.display='flex';
-    render(); // show role select behind overlay
-  }
+  // Auto-init Firebase (config hardcoded)
+  initFirebase(FIREBASE_CONFIG);
+  render();
 });
 
 // Handle offline — show role select even without Firebase
