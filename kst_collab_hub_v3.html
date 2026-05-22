@@ -134,11 +134,12 @@ const MSAL_CFG = {
   auth: {
     clientId: '2459a57b-bd24-4c19-8f82-1b1d607bd11a',
     authority: 'https://login.microsoftonline.com/1a4d139b-4e96-4d3b-8cfd-007453cc609e',
-    redirectUri: window.location.origin + window.location.pathname,
+    redirectUri: 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_collab_hub_v3.html',
+    navigateToLoginRequestUrl: false,
   },
-  cache: { cacheLocation: 'sessionStorage' }
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 };
-const SP_SCOPES  = ['Files.Read','User.Read'];
+const SP_SCOPES = ['Files.Read','User.Read'];
 const SP_SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_SHEET   = 'rm%20recive';
 const SP_API     = 'https://graph.microsoft.com/v1.0/shares/'+SP_SHARE_ID+'/driveItem/workbook/worksheets/'+SP_SHEET+'/usedRange';
@@ -156,25 +157,63 @@ function getMSAL(){
 
 async function getSPToken(){
   var app = getMSAL();
-  if(!app) return null;
+  if(!app){ spError='MSAL ไม่พร้อม — กรุณา reload หน้า'; return null; }
+
+  // Handle redirect response (after redirect login)
+  try{ await app.handleRedirectPromise(); }catch(e){}
+
   var accounts = app.getAllAccounts();
-  var req = { scopes: SP_SCOPES, account: accounts[0]||null };
-  try{
-    var res = accounts.length>0 ? await app.acquireTokenSilent(req) : await app.acquireTokenPopup(req);
-    return res.accessToken;
-  }catch(e){
-    try{ var res2 = await app.acquireTokenPopup(req); return res2.accessToken; }
-    catch(e2){ spError='Login failed: '+e2.message; return null; }
+  if(!accounts.length){
+    // No logged in user — try popup first, fallback to redirect
+    try{
+      var r = await app.acquireTokenPopup({ scopes:SP_SCOPES });
+      return r.accessToken;
+    }catch(popupErr){
+      if(popupErr.errorCode==='popup_window_error'||popupErr.errorCode==='user_cancelled'||String(popupErr.message).indexOf('popup')>=0){
+        // Popup blocked → use redirect
+        spError='popup_blocked'; // special flag
+        return null;
+      }
+      if(popupErr.errorCode==='redirect_uri_mismatch'||String(popupErr.message).indexOf('AADSTS50011')>=0){
+        spError='redirect_uri_mismatch';
+        return null;
+      }
+      spError=popupErr.errorCode?('['+popupErr.errorCode+'] '+popupErr.message):String(popupErr);
+      return null;
+    }
   }
+
+  // Existing account — silent first
+  try{
+    var r2 = await app.acquireTokenSilent({ scopes:SP_SCOPES, account:accounts[0] });
+    return r2.accessToken;
+  }catch(silentErr){
+    try{
+      var r3 = await app.acquireTokenPopup({ scopes:SP_SCOPES, account:accounts[0] });
+      return r3.accessToken;
+    }catch(e2){
+      spError=e2.errorCode?('['+e2.errorCode+'] '+e2.message):String(e2);
+      return null;
+    }
+  }
+}
+
+async function getSPTokenViaRedirect(){
+  var app=getMSAL(); if(!app) return;
+  spLoading=true; renderProcSection();
+  await app.loginRedirect({ scopes:SP_SCOPES });
 }
 
 async function fetchRMReceive(){
   if(spLoading) return;
-  spLoading=true; spError=null;
+  spLoading=true; spError=null; spData=null;
   renderProcSection();
   try{
     var token = await getSPToken();
-    if(!token){ spLoading=false; renderProcSection(); return; }
+    if(!token){
+      if(spError==='popup_blocked'||!spError){ spError=spError||'ไม่ได้รับ Token — กรุณาลอง Login Redirect'; }
+      spLoading=false; renderProcSection(); return;
+    }
     var res = await fetch(SP_API, { headers:{ Authorization:'Bearer '+token, Accept:'application/json' }});
     if(!res.ok){ throw new Error('HTTP '+res.status+' — '+await res.text()); }
     var json = await res.json();
@@ -570,7 +609,40 @@ function renderSPWidget(){
   if(spLoading){
     statusHtml = '<div style="display:flex;align-items:center;gap:8px;padding:10px;color:#FFB800;font-size:12px"><span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> กำลังดึงข้อมูลจาก SharePoint...</div>';
   } else if(spError){
-    statusHtml = '<div style="padding:10px;color:#FF4757;font-size:12px">⚠ '+esc(spError)+'<br><button id="btnSPRetry" class="btn btn-e btn-sm" style="margin-top:6px">↺ ลองใหม่</button></div>';
+    var errContent = '';
+    if(spError==='redirect_uri_mismatch'){
+      var curUri = window.location.href.split('?')[0];
+      errContent = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:14px 16px">'+
+        '<div style="font-weight:700;color:#FF4757;font-size:13px;margin-bottom:8px">⚠ Redirect URI ยังไม่ได้ลงทะเบียนใน Azure AD</div>'+
+        '<div style="color:#E8ECF1;font-size:12px;margin-bottom:10px">ต้องเพิ่ม URL นี้ในหน้า App Registration:</div>'+
+        '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 12px;font-family:JetBrains Mono,monospace;font-size:11px;color:#FFB800;word-break:break-all;margin-bottom:10px">'+esc(curUri)+'</div>'+
+        '<div style="font-size:11px;color:#6B7A8D;margin-bottom:10px">'+
+          '<b style="color:#E8ECF1">วิธีแก้:</b> Azure Portal → App Registrations → <b style="color:#00E5FF">2459a57b</b> → Authentication → Add platform → Single-page app → วาง URL ด้านบน → Save'+
+        '</div>'+
+        '<div style="display:flex;gap:8px">'+
+          '<button id="btnCopyUri" class="btn btn-c btn-sm">📋 Copy URI</button>'+
+          '<a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/2459a57b-bd24-4c19-8f82-1b1d607bd11a" target="_blank" class="btn btn-w btn-sm" style="text-decoration:none">🔗 เปิด Azure Portal</a>'+
+          '<button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองใหม่</button>'+
+        '</div>'+
+      '</div>';
+    } else if(spError==='popup_blocked'){
+      errContent = '<div style="background:rgba(255,184,0,0.08);border:1px solid rgba(255,184,0,0.3);border-radius:10px;padding:14px 16px">'+
+        '<div style="font-weight:700;color:#FFB800;font-size:13px;margin-bottom:8px">⚠ Browser บล็อก Popup</div>'+
+        '<div style="color:#E8ECF1;font-size:12px;margin-bottom:10px">กรุณาอนุญาต Popup สำหรับหน้านี้ หรือใช้ Redirect Login:</div>'+
+        '<div style="display:flex;gap:8px">'+
+          '<button id="btnSPRedirect" class="btn btn-w btn-sm">🔐 Login แบบ Redirect</button>'+
+          '<button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองอีกครั้ง (Popup)</button>'+
+        '</div>'+
+        '<div style="font-size:10px;color:#6B7A8D;margin-top:6px">แนะนำ: กด Allow popup ที่แถบ URL แล้วกด ลองอีกครั้ง</div>'+
+      '</div>';
+    } else {
+      errContent = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:12px 14px">'+
+        '<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ เกิดข้อผิดพลาด</div>'+
+        '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;word-break:break-all;margin-bottom:8px">'+esc(spError)+'</div>'+
+        '<button id="btnSPRetry" class="btn btn-e btn-sm">↺ ลองใหม่</button>'+
+      '</div>';
+    }
+    statusHtml = errContent;
   } else if(!spData){
     statusHtml = '<div style="padding:12px;text-align:center"><button id="btnSPFetch" class="btn btn-c" style="gap:8px">🔄 ดึงข้อมูล RM Receive จาก SharePoint</button><div style="color:#6B7A8D;font-size:10px;margin-top:6px">เชื่อมต่อ ksthatyai365 SharePoint | sheet: rm recive</div></div>';
   } else {
@@ -649,9 +721,18 @@ function renderSPWidget(){
 
 function bindSPButtons(){
   var b;
-  b=document.getElementById('btnSPFetch');  if(b) b.onclick=fetchRMReceive;
-  b=document.getElementById('btnSPRefresh');if(b) b.onclick=fetchRMReceive;
-  b=document.getElementById('btnSPRetry'); if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPFetch');    if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPRefresh');  if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPRetry');    if(b) b.onclick=function(){spError=null;fetchRMReceive();};
+  b=document.getElementById('btnSPRedirect'); if(b) b.onclick=getSPTokenViaRedirect;
+  b=document.getElementById('btnCopyUri');
+  if(b) b.onclick=function(){
+    var uri=window.location.href.split('?')[0];
+    navigator.clipboard.writeText(uri).then(function(){
+      b.textContent='✓ Copied!';b.style.color='#00D68F';
+      setTimeout(function(){b.innerHTML='📋 Copy URI';b.style.color='';},2000);
+    });
+  };
 }
 
 // ── PROCUREMENT ─────────────────────────────────────────────────────
@@ -1288,6 +1369,40 @@ function bindAll(){
 
 // ── BOOT ─────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
+  // Handle MSAL redirect response (after loginRedirect)
+  if(typeof msal !== 'undefined'){
+    try{
+      var app = new msal.PublicClientApplication({
+        auth:{
+          clientId:'2459a57b-bd24-4c19-8f82-1b1d607bd11a',
+          authority:'https://login.microsoftonline.com/1a4d139b-4e96-4d3b-8cfd-007453cc609e',
+          redirectUri:'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_collab_hub_v3.html',
+          navigateToLoginRequestUrl:false,
+        },
+        cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}
+      });
+      msalApp = app;
+      app.handleRedirectPromise().then(function(resp){
+        if(resp&&resp.accessToken){
+          // Returned from redirect login — fetch data automatically
+          spLoading=true;
+          fetch(SP_API,{headers:{Authorization:'Bearer '+resp.accessToken,Accept:'application/json'}})
+            .then(function(r){return r.json();})
+            .then(function(json){
+              var vals=json.values||[];
+              if(vals.length>=2){
+                var hdrs=vals[0].map(function(h){return String(h).trim().toLowerCase();});
+                spData=vals.slice(1).filter(function(r2){return r2.some(function(c){return c!==null&&c!=='';});}).map(function(r2){
+                  var obj={};hdrs.forEach(function(h,i){obj[h]=r2[i]!=null?String(r2[i]).trim():'';});return obj;
+                });
+              } else { spData=[]; }
+              spLastFetch=new Date(); spLoading=false; render();
+            }).catch(function(e){ spError=e.message; spLoading=false; render(); });
+        }
+      }).catch(function(e){ console.warn('handleRedirectPromise:',e); });
+    }catch(e){ console.warn('MSAL pre-init:',e); }
+  }
+
   initFB();
   render();
 });
