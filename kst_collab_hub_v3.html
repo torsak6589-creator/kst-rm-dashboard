@@ -236,7 +236,7 @@ const MSAL_CFG = {
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 };
-const SP_SCOPES = ['Files.Read','User.Read'];
+const SP_SCOPES = ['Files.Read.All','User.Read'];
 const SP_SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_SHEET   = 'rm%20recive';
 // SP_API: now uses download + SheetJS approach (workbook API not supported for this account type)
@@ -773,6 +773,7 @@ function renderSPWidget(){
     statusHtml = '<div style="display:flex;align-items:center;gap:8px;font-size:10px;padding:6px 0;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px">'+
       '<span style="color:#00D68F">●</span><span style="color:#6B7A8D">SharePoint RM Receive | ดึงข้อมูลล่าสุด: '+lastFetchStr+'</span>'+
       '<button id="btnSPRefresh" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
+    '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
       '</div>';
   }
 
@@ -845,6 +846,15 @@ function renderSPWidget(){
 function bindSPButtons(){
   var b;
   b=document.getElementById('btnSPFetch');    if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPLogout');
+  if(b) b.onclick=function(){
+    var app=getMSAL();
+    if(app){
+      var accts=app.getAllAccounts();
+      if(accts.length){ app.logout({account:accts[0]}); }
+      else { spError=null; spData=null; render(); }
+    }
+  };
   b=document.getElementById('btnSPRefresh');  if(b) b.onclick=fetchRMReceive;
   b=document.getElementById('btnSPRetry');    if(b) b.onclick=function(){spError=null;fetchRMReceive();};
   b=document.getElementById('btnSPRedirect'); if(b) b.onclick=getSPTokenViaRedirect;

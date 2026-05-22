@@ -127,6 +127,7 @@ body{font-family:sans-serif;background:#0A0F1E;color:#E8ECF1;padding:24px;max-wi
   <br><br>
   <button class="btn" onclick="testPopup()">🔐 Test Login (Popup)</button>
   <button class="btn" onclick="testRedirect()">🔄 Test Login (Redirect)</button>
+  <button class="btn" onclick="forceRelogin()" style="background:rgba(255,71,87,0.15);color:#FF4757;border-color:rgba(255,71,87,0.4)">⚠ Force Re-login (ล้าง cache)</button>
   <div id="loginStatus" style="margin-top:8px;color:#6B7A8D">—</div>
 </div>
 
@@ -144,7 +145,7 @@ body{font-family:sans-serif;background:#0A0F1E;color:#E8ECF1;padding:24px;max-wi
 const CLIENT_ID = '2459a57b-bd24-4c19-8f82-1b1d607bd11a';
 const TENANT_ID = '1a4d139b-4e96-4d3b-8cfd-007453cc609e';
 const REDIRECT_URI = window.location.href.split('?')[0];
-const SCOPES = ['Files.Read','User.Read'];
+const SCOPES = ['Files.Read.All','User.Read'];
 const SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_API = 'https://graph.microsoft.com/v1.0/shares/'+SHARE_ID+'/driveItem/workbook/worksheets/rm%20recive/usedRange';
 
@@ -202,11 +203,25 @@ window.addEventListener('load', function(){
   }
 });
 
+function forceRelogin(){
+  if(!msalApp){ log('msalApp not ready','err'); return; }
+  var accts=msalApp.getAllAccounts();
+  accts.forEach(function(a){ msalApp.removeAccount(a); });
+  log('Cache cleared — opening login with Files.Read.All scope...','warn');
+  msalApp.acquireTokenPopup({ scopes:SCOPES, prompt:'select_account' }).then(function(resp){
+    accessToken=resp.accessToken;
+    log('✅ Re-login success with new scope: '+resp.scopes.join(', '),'ok');
+    document.getElementById('loginStatus').innerHTML='<span style="color:#00D68F">✅ Re-logged in: '+resp.account.username+'</span>';
+    document.getElementById('btnTestSP').style.display='inline-block';
+  }).catch(function(e){
+    log('Re-login error: '+e.errorCode+' '+e.message,'err');
+  });
+}
 function testPopup(){
   if(!msalApp){ log('msalApp not ready','err'); return; }
   log('Attempting popup login...','info');
   document.getElementById('loginStatus').textContent = '⟳ กำลัง login...';
-  msalApp.acquireTokenPopup({ scopes:SCOPES }).then(function(resp){
+  msalApp.acquireTokenPopup({ scopes:SCOPES, prompt:'select_account' }).then(function(resp){
     accessToken = resp.accessToken;
     log('✅ Popup login success: '+resp.account.username,'ok');
     document.getElementById('loginStatus').innerHTML = '<span style="color:#00D68F">✅ Login สำเร็จ: '+resp.account.username+'</span>';
