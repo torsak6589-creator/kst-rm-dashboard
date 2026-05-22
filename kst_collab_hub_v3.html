@@ -273,6 +273,7 @@ let spLoading = false;
 let spData = null;     // rows from SharePoint
 let spLastFetch = null;
 let spError = null;
+let spDebug = {};      // diagnostic info
 
 function getMSAL(){
   if(!msalApp){ try{ msalApp=new msal.PublicClientApplication(MSAL_CFG); }catch(e){ console.error('MSAL init:',e); } }
@@ -838,6 +839,7 @@ function renderPlanning(){
 
 // ── SHAREPOINT RM RECEIVE WIDGET ─────────────────────────────────
 function renderSPWidget(){
+  var dbg = typeof spDebug !== 'undefined' ? spDebug : {};
   var dateToShow = filterDate; // empty = ทั้งหมด
   var rows = spData ? (dateToShow ? spForDate(dateToShow) : spData) : null;
 
@@ -995,11 +997,11 @@ function renderSPWidget(){
     var debugHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">'+
       '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
       '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.8">'+
-      'File: <b style="color:#E8ECF1">'+(spDebug.fileName||'?')+'</b> &nbsp; Size: <b style="color:#E8ECF1">'+(spDebug.fileSize?Math.round(spDebug.fileSize/1024)+'KB':'?')+'</b><br>'+
-      'Sheets: <span style="color:#7B61FF">'+(spDebug.allSheets?spDebug.allSheets.join(' | '):'?')+'</span><br>'+
-      'Sheet used: <b style="color:#00E5FF">'+(spDebug.sheetFound||'?')+'</b> &nbsp; Raw rows: <b style="color:#E8ECF1">'+(spDebug.rawRows!=null?spDebug.rawRows:'?')+'</b><br>'+
-      'Row 0 (actual): <span style="color:#FF4757">'+(spDebug.firstRowSample||'?')+'</span><br>'+
-      'Header row idx: <b style="color:#FFB800">'+(spDebug.headerRowIdx!=null?spDebug.headerRowIdx:'?')+'</b> &nbsp; Header: <span style="color:#00D68F">'+(spDebug.headerRowSample||'?')+'</span><br>'+
+      'File: <b style="color:#E8ECF1">'+(dbg.fileName||'?')+'</b> &nbsp; Size: <b style="color:#E8ECF1">'+(dbg.fileSize?Math.round(dbg.fileSize/1024)+'KB':'?')+'</b><br>'+
+      'Sheets: <span style="color:#7B61FF">'+(dbg.allSheets?dbg.allSheets.join(' | '):'?')+'</span><br>'+
+      'Sheet used: <b style="color:#00E5FF">'+(dbg.sheetFound||'?')+'</b> &nbsp; Raw rows: <b style="color:#E8ECF1">'+(dbg.rawRows!=null?dbg.rawRows:'?')+'</b><br>'+
+      'Row 0 (actual): <span style="color:#FF4757">'+(dbg.firstRowSample||'?')+'</span><br>'+
+      'Header row idx: <b style="color:#FFB800">'+(dbg.headerRowIdx!=null?dbg.headerRowIdx:'?')+'</b> &nbsp; Header: <span style="color:#00D68F">'+(dbg.headerRowSample||'?')+'</span><br>'+
       'Parsed (spData): <b style="color:'+(totalSpRows>0?'#00D68F':'#FF4757')+'">'+totalSpRows+'</b> &nbsp; Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b>'+
       '</div></div>';
     var hintHtml = recentDates.length?
