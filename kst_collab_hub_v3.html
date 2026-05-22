@@ -348,7 +348,7 @@ function renderHeader(){
     '<span class="dot cpulse" style="background:'+r.c+';box-shadow:0 0 4px '+r.c+'"></span></div></div>'+
     '<div style="display:flex;align-items:center;gap:7px">'+
     '<span id="connBadge" class="connwarn">○ CONNECTING</span>'+
-    ''+
+    '<button id="btnChange" class="btn btn-g btn-sm" style="gap:4px">⇄ เลือกฝ่าย</button>'+
     '</div></div>';
 }
 
@@ -838,6 +838,8 @@ function bindAll(){
 
   // Action buttons
   var b;
+  var chBtn=document.getElementById('btnChange');
+  if(chBtn) chBtn.onclick=function(){role=null;render();};
   var fInp=document.getElementById('filterDtInp');
   if(fInp) fInp.onchange=function(){filterDate=fInp.value;render();};
   var fToday=document.getElementById('btnFToday');
