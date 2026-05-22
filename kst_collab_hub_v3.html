@@ -23,7 +23,14 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #app{position:relative;z-index:1}
 
 .topbar{background:var(--glass);backdrop-filter:blur(20px);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,229,255,0.2);position:sticky;top:0;z-index:100;gap:10px}
-.statusbar{background:rgba(7,11,23,0.9);padding:5px 18px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--bd)}
+.navtabs{background:rgba(7,11,23,0.95);padding:0 14px;display:flex;gap:2px;align-items:stretch;border-bottom:2px solid rgba(0,229,255,0.18);overflow-x:auto}
+.navtab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 16px;cursor:pointer;border:none;background:transparent;color:#6B7A8D;font-family:Space Grotesk,Noto Sans Thai,sans-serif;font-size:12px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s;min-width:80px;white-space:nowrap;flex-shrink:0}
+.navtab .te{font-size:20px;margin-bottom:1px}
+.navtab .tl{font-size:11px;font-weight:600;letter-spacing:.3px}
+.navtab .ts{font-size:8px;font-weight:400;opacity:.6;letter-spacing:.3px}
+.navtab:hover{color:#E8ECF1;background:rgba(255,255,255,0.04)}
+.navtab.active{color:#E8ECF1;background:rgba(255,255,255,0.04);border-bottom-color:currentColor}
+.navtab.has-data .tl::after{content:'●';font-size:6px;vertical-align:super;margin-left:3px}
 .notifstrip{background:rgba(0,229,255,0.03);border-bottom:1px solid var(--bd);padding:5px 18px;display:flex;gap:12px;overflow-x:auto;align-items:center;font-size:11px}
 .main{padding:14px;max-width:1100px;margin:0 auto}
 
@@ -88,12 +95,17 @@ tbody tr:nth-child(even){background:rgba(0,229,255,0.018)}
 .bi{padding:9px 11px;border-radius:9px;border:1px solid var(--bd);margin-bottom:7px;cursor:pointer;transition:border-color .2s}
 .bi.sel{border-color:rgba(0,214,143,0.5);background:rgba(0,214,143,0.07)}
 
+.filterbar{background:rgba(7,11,23,0.9);padding:5px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(0,229,255,0.1);flex-wrap:wrap}
+.filterbar label{font-size:9px;font-weight:700;color:#6B7A8D;text-transform:uppercase;letter-spacing:.8px;font-family:Space Grotesk,sans-serif}
+.filterbar input[type=date]{background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:4px 9px;font-size:12px;color:#E8ECF1;outline:none;font-family:JetBrains Mono,monospace}
+.filterbar input[type=date]:focus{border-color:rgba(0,229,255,0.45)}
+.factive{background:rgba(0,229,255,0.12);border:1px solid rgba(0,229,255,0.4);color:#00E5FF;padding:3px 9px;border-radius:14px;font-size:9px;font-weight:700;font-family:Space Grotesk,sans-serif}
 .connok{background:rgba(0,214,143,0.12);color:var(--ok);border:1px solid rgba(0,214,143,0.3);padding:3px 9px;border-radius:14px;font-size:9px;font-weight:700;font-family:'Space Grotesk',sans-serif}
 .connwarn{background:rgba(255,184,0,0.12);color:var(--warn);border:1px solid rgba(255,184,0,0.3);padding:3px 9px;border-radius:14px;font-size:9px;font-weight:700;font-family:'Space Grotesk',sans-serif}
 
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:rgba(0,229,255,0.2);border-radius:2px}
-@media print{.topbar,.statusbar,.notifstrip,.btn{display:none!important}}
+@media print{.topbar,.navtabs,.notifstrip,.btn,.filterbar{display:none!important}}
 </style>
 </head>
 <body>
@@ -141,6 +153,7 @@ let data = {orders:[],targets:[],pos:[],actuals:[],qc:[],shipments:[],notificati
 let connected = false;
 let selBatch = null;
 let gr = {a:0,b:0,c:0,d:0,bk:0,def:0};
+let filterDate = '';
 
 // Forms
 let pf = {sz:'31/40',ct:100,pr:'',note:''};
@@ -156,6 +169,21 @@ function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 function tod(){return new Date().toISOString().slice(0,10);}
 function ts(d){return new Date(d).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
 function spv(sz){return SPEC[sz]||SPEC['31/40'];}
+function fd(){
+  if(!filterDate) return data;
+  return {
+    orders: data.orders,
+    targets: data.targets.filter(function(t){return t.date===filterDate;}),
+    pos: data.pos,
+    actuals: data.actuals.filter(function(a){return a.date===filterDate;}),
+    qc: data.qc.filter(function(q){return q.date===filterDate;}),
+    shipments: data.shipments.filter(function(s){return s.shipDate===filterDate||(s.isInventory&&true);}),
+    notifications: data.notifications.filter(function(n){
+      var d=new Date(n.time);
+      return d.toISOString().slice(0,10)===filterDate;
+    })
+  };
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // Firebase
@@ -219,7 +247,7 @@ function render(){
   }
   var viewFns = {planning:renderPlanning,procurement:renderProcurement,production:renderProduction,qc:renderQC,sales:renderSales,management:renderManagement};
   var viewFn = viewFns[role]||renderManagement;
-  app.innerHTML = renderHeader() + renderStatusBar() + strip + '<div class="main">'+viewFn()+'</div>';
+  app.innerHTML = renderHeader() + renderStatusBar() + renderFilterBar() + strip + '<div class="main">'+viewFn()+'</div>';
   bindAll();
 }
 
@@ -288,6 +316,25 @@ function renderRoleSelect(){
 }
 
 // ── HEADER ─────────────────────────────────────────────────────────
+function renderFilterBar(){
+  var todayStr=tod();
+  var activeHtml=filterDate?'<span class="factive">'+filterDate+'</span>':'';
+  var summaryHtml='';
+  if(filterDate){
+    var d2=fd();
+    var fgAct=d2.actuals.reduce(function(a,x){return a+(x.fgKg||0);},0);
+    var qcApp=d2.qc.filter(function(q){return q.status==='approved';}).length;
+    var ships=d2.shipments.filter(function(s){return s.shipDate===filterDate&&s.containerNo;}).length;
+    summaryHtml='<span style="color:#6B7A8D;font-size:9px;font-family:JetBrains Mono,monospace;margin-left:8px">FG:'+fgAct+'kg · QC OK:'+qcApp+' batch · ส่ง:'+ships+' container</span>';
+  }
+  return '<div class="filterbar">'+
+    '<label>Filter วันที่</label>'+
+    '<input type="date" id="filterDtInp" value="'+filterDate+'" max="'+todayStr+'">'+
+    '<button id="btnFToday" class="btn btn-c btn-sm">วันนี้</button>'+
+    '<button id="btnFAll" class="btn btn-g btn-sm">ทั้งหมด</button>'+
+    activeHtml+summaryHtml+
+    '</div>';
+}
 function renderHeader(){
   var r = ROLES.find(function(x){return x.id===role;})||ROLES[0];
   return '<div class="topbar">'+
@@ -301,7 +348,7 @@ function renderHeader(){
     '<span class="dot cpulse" style="background:'+r.c+';box-shadow:0 0 4px '+r.c+'"></span></div></div>'+
     '<div style="display:flex;align-items:center;gap:7px">'+
     '<span id="connBadge" class="connwarn">○ CONNECTING</span>'+
-    '<button id="btnChange" class="btn btn-g btn-sm">เปลี่ยนฝ่าย</button>'+
+    ''+
     '</div></div>';
 }
 
@@ -440,13 +487,14 @@ function renderProcurement(){
 
 // ── PRODUCTION ─────────────────────────────────────────────────────
 function renderProduction(){
+  var d2=fd();
   var sp = spv(prd.sz);
   var totFgPlan = data.orders.reduce(function(a,o){return a+(o.kgFg||0);},0);
-  var totFgAct = data.actuals.reduce(function(a,x){return a+(x.fgKg||0);},0);
-  var totRmUsed = data.actuals.reduce(function(a,x){return a+(x.rmKg||0);},0);
+  var totFgAct = d2.actuals.reduce(function(a,x){return a+(x.fgKg||0);},0);
+  var totRmUsed = d2.actuals.reduce(function(a,x){return a+(x.rmKg||0);},0);
   var avgY = totRmUsed>0?(totFgAct/totRmUsed)*100:0;
   var todTgt = (data.targets.find(function(t){return t.date===tod();})||{}).fgKg||0;
-  var todAct = data.actuals.filter(function(a){return a.date===tod();}).reduce(function(a,x){return a+(x.fgKg||0);},0);
+  var todAct = d2.actuals.filter(function(a){return a.date===tod();}).reduce(function(a,x){return a+(x.fgKg||0);},0);
   var autoRm = prd.fg?(prd.fg/sp.y).toFixed(0):'';
   var actY = (prd.fg&&prd.rm)?(prd.fg/prd.rm*100).toFixed(1):null;
   var yc = actY?(parseFloat(actY)>=64?'#00D68F':'#FFB800'):null;
@@ -499,15 +547,17 @@ function renderProduction(){
 
 // ── QC ──────────────────────────────────────────────────────────────
 function renderQC(){
-  var pending=data.qc.filter(function(q){return q.status==='pending';});
-  var approved=data.qc.filter(function(q){return q.status==='approved';});
-  var onHold=data.qc.filter(function(q){return q.status==='hold';});
+  var d2=fd();
+  var pending=d2.qc.filter(function(q){return q.status==='pending';});
+  var approved=d2.qc.filter(function(q){return q.status==='approved';});
+  var onHold=d2.qc.filter(function(q){return q.status==='hold';});
   var avgA=approved.length>0?approved.reduce(function(a,q){return a+(q.gradeA||0);},0)/approved.length:0;
   var sel=data.qc.find(function(q){return q.id===selBatch;});
+  var qcAll=d2.qc;
   var tot=+gr.a+ +gr.b+ +gr.c+ +gr.d+ +gr.bk;
   var valid=Math.abs(tot-100)<1;
 
-  var batchItems=data.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
+  var batchItems=d2.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
     var isSel=selBatch===q.id;
     var sc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[q.status]||'#6B7A8D';
     var extra=q.status!=='pending'?'<div style="font-size:10px;color:#6B7A8D;margin-top:3px">%A:'+q.gradeA+' %B:'+q.gradeB+' %C:'+q.gradeC+' %D:'+q.gradeD+' %BK:'+q.gradeBK+' Defect:'+q.defectPct+'%</div>':'';
@@ -531,7 +581,7 @@ function renderQC(){
     '<div style="display:flex;gap:8px">'+BTN('btnQCApprove','✓ อนุมัติ','btn-ok')+BTN('btnQCHold','⚠ Hold','btn-e')+'</div>'
     :'<div style="text-align:center;padding:32px;color:#6B7A8D">👆 คลิก Batch ที่ต้องการตรวจ QC</div>';
 
-  var qcRows=data.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
+  var qcRows=d2.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
     var sc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[q.status]||'#6B7A8D';
     return '<tr><td>'+esc(q.date||'')+'</td><td>'+esc(q.size||'')+'</td><td class="r">'+fmt(q.fgKg)+'</td>'+
       '<td class="r" style="color:'+((q.gradeA||0)>=63?'#00D68F':'#FFB800')+'">'+((q.gradeA)||'—')+'</td>'+
@@ -557,9 +607,10 @@ function renderQC(){
 
 // ── SALES ──────────────────────────────────────────────────────────
 function renderSales(){
+  var d2=fd();
   var inv=data.qc.filter(function(q){return q.status==='approved';});
   var totApp=inv.reduce(function(a,q){return a+(q.fgKg||0);},0);
-  var ships=data.shipments.filter(function(s){return s.containerNo&&!s.isInventory;});
+  var ships=d2.shipments.filter(function(s){return s.containerNo&&!s.isInventory;});
   var totShip=ships.reduce(function(a,s){return a+(s.kgFg||0);},0);
   var totRev=ships.reduce(function(a,s){return a+(s.revThb||0);},0);
 
@@ -708,10 +759,12 @@ function bindRoleCards(){
 function getVal(id){var e=document.getElementById(id);return e?e.value:'';}
 function getNum(id){var v=parseFloat(getVal(id));return isNaN(v)?0:v;}
 
+function switchRole(rid){
+  role=rid;
+  selBatch=null;
+  render();
+}
 function bindAll(){
-  var chBtn=document.getElementById('btnChange');
-  if(chBtn) chBtn.onclick=function(){role=null;render();};
-
   // Del order
   document.querySelectorAll('.del-order').forEach(function(btn){
     btn.onclick=function(){fbDel('orders',btn.getAttribute('data-id'));};
@@ -785,6 +838,12 @@ function bindAll(){
 
   // Action buttons
   var b;
+  var fInp=document.getElementById('filterDtInp');
+  if(fInp) fInp.onchange=function(){filterDate=fInp.value;render();};
+  var fToday=document.getElementById('btnFToday');
+  if(fToday) fToday.onclick=function(){filterDate=tod();render();};
+  var fAll=document.getElementById('btnFAll');
+  if(fAll) fAll.onclick=function(){filterDate='';render();};
   b=document.getElementById('btnAddOrder');
   if(b) b.onclick=function(){
     var sp=spv(pf.sz);var fgKg=(pf.ct||0)*KGC;
@@ -828,6 +887,7 @@ function bindAll(){
     var tot=+gr.a+ +gr.b+ +gr.c+ +gr.d+ +gr.bk;
     if(Math.abs(tot-100)>=1){alert('Grade ต้องรวมได้ 100%');return;}
     var sel=data.qc.find(function(q){return q.id===selBatch;});
+  var qcAll=d2.qc;
     fbUpd('qc',selBatch,{gradeA:+gr.a,gradeB:+gr.b,gradeC:+gr.c,gradeD:+gr.d,gradeBK:+gr.bk,defectPct:+gr.def,status:'approved',qcDate:tod()});
     fbNotif('qc','QC Approved: '+(sel?sel.date:'')+' '+(sel?sel.size:'')+' — %A: '+gr.a+'%');
     selBatch=null;gr={a:0,b:0,c:0,d:0,bk:0,def:0};
@@ -836,6 +896,7 @@ function bindAll(){
   if(b) b.onclick=function(){
     if(!selBatch)return;
     var sel=data.qc.find(function(q){return q.id===selBatch;});
+  var qcAll=d2.qc;
     fbUpd('qc',selBatch,{gradeA:+gr.a,gradeB:+gr.b,gradeC:+gr.c,gradeD:+gr.d,gradeBK:+gr.bk,defectPct:+gr.def,status:'hold',qcDate:tod()});
     fbNotif('qc','QC HOLD: '+(sel?sel.date:'')+' '+(sel?sel.size:''));
     selBatch=null;
