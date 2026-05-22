@@ -236,7 +236,7 @@ const MSAL_CFG = {
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 };
-const SP_SCOPES = ['Files.Read.All','User.Read'];
+const SP_SCOPES = ['Files.Read','User.Read'];
 const SP_SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_SHEET   = 'rm%20recive';
 // SP_API: now uses download + SheetJS approach (workbook API not supported for this account type)
@@ -313,15 +313,54 @@ async function fetchRMReceive(){
     }
     if(typeof XLSX==='undefined'){ throw new Error('SheetJS ไม่พร้อม — reload หน้า'); }
 
-    // ── ดาวน์โหลดไฟล์ xlsx โดยตรงด้วย /content endpoint ─────────────
-    // SharePoint ไม่ให้ downloadUrl ใน metadata → ใช้ /content แทน
+    // ── ค้นหาไฟล์จาก Drive โดยตรง (Files.Read — ไม่ต้อง admin consent) ──
+    // Drive ID จาก kst_rm_v16.html (SharePoint KSTRMUPDATEV2 drive)
+    var DRIVE_ID = 'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK';
+
+    // Step 1: ค้นหาไฟล์ rm recive ใน drive
+    var searchRes = await fetch(
+      "https://graph.microsoft.com/v1.0/drives/"+DRIVE_ID+"/root/search(q='rm recive')",
+      {headers:{Authorization:'Bearer '+token,Accept:'application/json'}}
+    );
+
+    var itemId = null;
+    if(searchRes.ok){
+      var searchJson = await searchRes.json();
+      var items = (searchJson.value||[]).filter(function(i){
+        return i.name && i.name.toLowerCase().indexOf('rm') >= 0 &&
+               (i.name.toLowerCase().indexOf('recive')>=0 || i.name.toLowerCase().indexOf('receive')>=0 || i.name.toLowerCase().indexOf('รับ')>=0);
+      });
+      if(!items.length) items = (searchJson.value||[]).filter(function(i){return i.file&&i.name&&i.name.match(/\.xlsx?$/i);});
+      if(items.length){ itemId = items[0].id; console.log('Found file:', items[0].name, 'id:', itemId); }
+    }
+
+    // Step 2: ถ้าหาไม่เจอ — ลอง list root children
+    if(!itemId){
+      var listRes = await fetch(
+        'https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/root/children',
+        {headers:{Authorization:'Bearer '+token,Accept:'application/json'}}
+      );
+      if(listRes.ok){
+        var listJson = await listRes.json();
+        var files = (listJson.value||[]).filter(function(i){ return i.file&&i.name&&i.name.match(/\.xlsx?$/i); });
+        console.log('Files in root:', files.map(function(f){return f.name;}));
+        var rmFile = files.find(function(i){ return i.name.toLowerCase().indexOf('rm')>=0; });
+        if(rmFile) itemId = rmFile.id;
+      }
+    }
+
+    if(!itemId){
+      throw new Error('ไม่พบไฟล์ rm recive ใน Drive — ตรวจสอบสิทธิ์การเข้าถึง drive หรือลอง Grant Admin Consent');
+    }
+
+    // Step 3: ดาวน์โหลดไฟล์ xlsx
     var contentRes = await fetch(
-      'https://graph.microsoft.com/v1.0/shares/'+SP_SHARE_ID+'/driveItem/content',
+      'https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/items/'+itemId+'/content',
       {headers:{Authorization:'Bearer '+token}}
     );
     if(!contentRes.ok){
       var errText = await contentRes.text();
-      throw new Error('HTTP '+contentRes.status+': '+errText.slice(0,400));
+      throw new Error('Download HTTP '+contentRes.status+': '+errText.slice(0,400));
     }
     var buf = await contentRes.arrayBuffer();
     if(!buf||buf.byteLength<100){ throw new Error('ไฟล์ xlsx ว่างเปล่า ('+buf.byteLength+' bytes)'); }

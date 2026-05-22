@@ -145,7 +145,7 @@ body{font-family:sans-serif;background:#0A0F1E;color:#E8ECF1;padding:24px;max-wi
 const CLIENT_ID = '2459a57b-bd24-4c19-8f82-1b1d607bd11a';
 const TENANT_ID = '1a4d139b-4e96-4d3b-8cfd-007453cc609e';
 const REDIRECT_URI = window.location.href.split('?')[0];
-const SCOPES = ['Files.Read.All','User.Read'];
+const SCOPES = ['Files.Read','User.Read'];
 const SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_API = 'https://graph.microsoft.com/v1.0/shares/'+SHARE_ID+'/driveItem/workbook/worksheets/rm%20recive/usedRange';
 
@@ -253,24 +253,43 @@ function testSP(){
 }
 
 function doSPFetch(){
-  log('Downloading xlsx via /driveItem/content...','info');
-  document.getElementById('spStatus').textContent='⟳ กำลังดาวน์โหลดไฟล์ xlsx...';
-  fetch('https://graph.microsoft.com/v1.0/shares/'+SHARE_ID+'/driveItem/content',
-    {headers:{Authorization:'Bearer '+accessToken}})
+  var DRIVE_ID='b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK';
+  log('Step 1: Searching for rm recive file in Drive...','info');
+  document.getElementById('spStatus').textContent='⟳ กำลังค้นหาไฟล์...';
+
+  fetch("https://graph.microsoft.com/v1.0/drives/"+DRIVE_ID+"/root/search(q='rm recive')",
+    {headers:{Authorization:'Bearer '+accessToken,Accept:'application/json'}})
   .then(function(r){
-    log('HTTP '+r.status,r.ok?'ok':'err');
-    if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t.slice(0,400));});
+    log('Search HTTP '+r.status,r.ok?'ok':'err');
+    if(!r.ok)return r.text().then(function(t){throw new Error('Search HTTP '+r.status+': '+t.slice(0,300));});
+    return r.json();
+  })
+  .then(function(json){
+    var items=(json.value||[]);
+    log('Search results: '+items.length+' items | '+items.map(function(i){return i.name;}).join(', '),'ok');
+    var xlsFiles=items.filter(function(i){return i.file&&i.name&&i.name.match(/\.xlsx?$/i);});
+    var rmFile=xlsFiles.find(function(i){return i.name.toLowerCase().indexOf('rm')>=0&&(i.name.toLowerCase().indexOf('recive')>=0||i.name.toLowerCase().indexOf('receive')>=0);})
+      || xlsFiles[0];
+    if(!rmFile) throw new Error('ไม่พบไฟล์ rm recive — ไฟล์ xlsx ที่เจอ: '+xlsFiles.map(function(i){return i.name;}).join(', ')||'ไม่มีเลย');
+    log('Found file: '+rmFile.name+' ('+rmFile.id+')','ok');
+    return fetch('https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/items/'+rmFile.id+'/content',
+      {headers:{Authorization:'Bearer '+accessToken}});
+  })
+  .then(function(r){
+    log('Download HTTP '+r.status,r.ok?'ok':'err');
+    if(!r.ok)return r.text().then(function(t){throw new Error('Download HTTP '+r.status+': '+t.slice(0,300));});
     return r.arrayBuffer();
-  }).then(function(buf){
-    log('Downloaded: '+buf.byteLength+' bytes — parsing xlsx...','ok');
+  })
+  .then(function(buf){
+    log('xlsx: '+buf.byteLength+' bytes — parsing...','ok');
     var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
-    log('Sheets available: '+wb.SheetNames.join(' | '),'ok');
+    log('Sheets: '+wb.SheetNames.join(' | '),'ok');
     var sn=wb.SheetNames.find(function(s){return s.trim().toLowerCase().replace(/\s+/g,'')===('rmrecive');})||wb.SheetNames[0];
-    log('Reading sheet: '+sn,'info');
     var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
-    log('✅ สำเร็จ! '+rows.length+' rows | Headers: '+(rows[0]?rows[0].join(' | '):'—'),'ok');
+    log('✅ สำเร็จ! '+rows.length+' rows | Sheet: '+sn+' | Headers: '+(rows[0]?rows[0].join(' | '):'—'),'ok');
     document.getElementById('spStatus').innerHTML='<span style="color:#00D68F">✅ ดึงข้อมูลสำเร็จ!<br>'+rows.length+' แถว | Sheet: '+sn+'<br>Headers: '+(rows[0]?rows[0].join(' | '):'—')+'</span>';
-  }).catch(function(e){
+  })
+  .catch(function(e){
     log('❌ '+e.message,'err');
     document.getElementById('spStatus').innerHTML='<span style="color:#FF4757">❌ '+e.message+'</span>';
   });
