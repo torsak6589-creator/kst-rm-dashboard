@@ -454,7 +454,7 @@ function spForDate(dateStr){
   if(!spData||!spData.length) return [];
   // ตัวอย่าง column: "รับวัตถุดิบทุกประเภท[วันที่กุ้งเข้า]"
   var sampleKeys = Object.keys(spData[0]);
-  // ใช้ exact column name จาก RMCOL
+  if(!dateStr) return spData.slice(); // ทั้งหมด
   return spData.filter(function(r){
     var dateVal = rmGet(r, RMCOL.date);
     return parseSpDate(dateVal) === dateStr;
@@ -815,8 +815,8 @@ function renderPlanning(){
 
 // ── SHAREPOINT RM RECEIVE WIDGET ─────────────────────────────────
 function renderSPWidget(){
-  var dateToShow = filterDate||tod();
-  var rows = spData ? spForDate(dateToShow) : null;
+  var dateToShow = filterDate; // empty = ทั้งหมด
+  var rows = spData ? (dateToShow ? spForDate(dateToShow) : spData) : null;
 
   // ── Status bar
   var statusHtml = '';
@@ -861,10 +861,15 @@ function renderSPWidget(){
     statusHtml = '<div style="padding:12px;text-align:center"><button id="btnSPFetch" class="btn btn-c" style="gap:8px">🔄 ดึงข้อมูล RM Receive จาก SharePoint</button><div style="color:#6B7A8D;font-size:10px;margin-top:6px">เชื่อมต่อ ksthatyai365 SharePoint | sheet: rm recive</div></div>';
   } else {
     var lastFetchStr = spLastFetch?spLastFetch.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
-    statusHtml = '<div style="display:flex;align-items:center;gap:8px;font-size:10px;padding:6px 0;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px">'+
-      '<span style="color:#00D68F">●</span><span style="color:#6B7A8D">SharePoint RM Receive | ดึงข้อมูลล่าสุด: '+lastFetchStr+'</span>'+
+    var totalRows = spData?spData.length:0;
+    var allDates2 = spData?[...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(Boolean))].sort():[];
+    var latestDate = allDates2.length?allDates2[allDates2.length-1]:'—';
+    statusHtml = '<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:6px 0;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px;flex-wrap:wrap">'+
+      '<span style="color:#00D68F">●</span>'+
+      '<span style="color:#6B7A8D">SharePoint RM Receive | ดึงล่าสุด: '+lastFetchStr+'</span>'+
+      '<span style="font-family:JetBrains Mono,monospace;color:#00E5FF;font-size:9px">'+totalRows.toLocaleString()+' แถว | ล่าสุด: '+latestDate+'</span>'+
       '<button id="btnSPRefresh" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
-    '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
+      '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
       '</div>';
   }
 
@@ -957,7 +962,31 @@ function renderSPWidget(){
       colOrder.map(function(k){return '<th style="font-size:9px">'+esc(k.toUpperCase())+'</th>';}).join('')+
       '</tr></thead><tbody>'+rowsHtml+'</tbody></table></div>';
   } else {
-    tableHtml = '<div style="color:#6B7A8D;text-align:center;padding:20px;font-size:12px">ไม่มีรายการรับ RM วันที่ '+dateToShow+'</div>';
+    // Debug + วันที่มีข้อมูล
+    var availDates2 = spData?[...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(function(d){return d&&d!=='';}))]
+      .sort():[];
+    var totalSpRows = spData?spData.length:0;
+    var sampleCols = spData&&spData[0]?Object.keys(spData[0]).slice(0,4).join(' | '):'—';
+    var recentDates = availDates2.slice(-5).reverse();
+    // Debug box
+    var debugHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">'+
+      '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">⚠ DEBUG INFO</div>'+
+      '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.7">'+
+      'Total rows loaded: <b style="color:#E8ECF1">'+totalSpRows+'</b><br>'+
+      'Available dates: <b style="color:#E8ECF1">'+availDates2.length+'</b> unique dates<br>'+
+      'Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b><br>'+
+      'Sample cols: <span style="color:#7B61FF">'+esc(sampleCols)+'</span>'+
+      '</div></div>';
+    var hintHtml = recentDates.length?
+      '<div style="margin-top:8px;font-size:11px;color:#6B7A8D;text-align:left">วันที่มีข้อมูลล่าสุด: '+
+        recentDates.map(function(d){
+          return '<button onclick="filterDate=\'' + d + '\';renderProcSection();" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:2px 8px;color:#00E5FF;font-size:11px;cursor:pointer;margin:2px">' + d + '</button>';
+        }).join('')+'</div>':'';
+    tableHtml = (totalSpRows>0?debugHtml:'')+
+      '<div style="color:#6B7A8D;text-align:center;padding:12px;font-size:12px">'+
+      (dateToShow?'ไม่มีรายการรับ RM วันที่ <b style="color:#E8ECF1">'+dateToShow+'</b>':
+       (totalSpRows===0?'ไม่มีข้อมูลใน SharePoint — ตรวจสอบชื่อ Sheet':'ไม่มีข้อมูล (กด วันที่มีข้อมูล ด้านล่าง)'))+
+      hintHtml+'</div>';
   }
 
   return '<div id="spSection">'+statusHtml+kpiHtml+szBarHtml+tableHtml+'</div>';
