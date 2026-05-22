@@ -238,63 +238,25 @@ function testSP(){
 }
 
 function doSPFetch(){
-  log('Step 1: Getting driveItem from shares API...','info');
-  document.getElementById('spStatus').textContent = '⟳ กำลังดึงข้อมูล...';
-
-  // Step 1: Get driveItem metadata (for download URL)
-  fetch('https://graph.microsoft.com/v1.0/shares/'+SHARE_ID+'/driveItem?$select=id,name,@microsoft.graph.downloadUrl,parentReference', {
-    headers:{ Authorization:'Bearer '+accessToken, Accept:'application/json' }
-  })
+  log('Downloading xlsx via /driveItem/content...','info');
+  document.getElementById('spStatus').textContent='⟳ กำลังดาวน์โหลดไฟล์ xlsx...';
+  fetch('https://graph.microsoft.com/v1.0/shares/'+SHARE_ID+'/driveItem/content',
+    {headers:{Authorization:'Bearer '+accessToken}})
   .then(function(r){
-    log('driveItem status: HTTP '+r.status, r.ok?'ok':'err');
-    if(!r.ok) return r.text().then(function(t){throw new Error('driveItem HTTP '+r.status+': '+t.slice(0,300));});
-    return r.json();
-  })
-  .then(function(item){
-    log('File: '+item.name+' | driveId: '+(item.parentReference&&item.parentReference.driveId?item.parentReference.driveId.slice(0,20)+'...':'—'),'ok');
-    var dlUrl = item['@microsoft.graph.downloadUrl'];
-    if(dlUrl){
-      log('Got download URL — fetching xlsx binary...','info');
-      return fetch(dlUrl);
-    }
-    // Fallback: use drives API via parentReference
-    var driveId = item.parentReference&&item.parentReference.driveId;
-    var itemId  = item.id;
-    if(driveId&&itemId){
-      log('No downloadUrl — trying workbook API via drives/...','info');
-      return fetch('https://graph.microsoft.com/v1.0/drives/'+driveId+'/items/'+itemId+'/workbook/worksheets/rm%20recive/usedRange',{
-        headers:{Authorization:'Bearer '+accessToken,Accept:'application/json'}
-      }).then(function(r2){
-        if(!r2.ok) return r2.text().then(function(t){throw new Error('workbook HTTP '+r2.status+': '+t.slice(0,300));});
-        return r2.json().then(function(j){
-          var rows=(j.values||[]).length;
-          log('✅ Workbook API success: '+rows+' rows','ok');
-          document.getElementById('spStatus').innerHTML='<span style="color:#00D68F">✅ ดึงข้อมูลสำเร็จ! '+rows+' แถว</span>';
-        });
-      });
-    }
-    throw new Error('ไม่พบ downloadUrl และไม่มี driveId/itemId');
-  })
-  .then(function(resp){
-    if(!resp) return; // already handled workbook API case
-    if(!resp.ok) throw new Error('Download HTTP '+resp.status);
-    return resp.arrayBuffer();
-  })
-  .then(function(buf){
-    if(!buf) return;
-    log('xlsx downloaded: '+buf.byteLength+' bytes — parsing...','info');
-    var wb = XLSX.read(new Uint8Array(buf),{type:'array'});
-    log('Sheets found: '+wb.SheetNames.join(', '),'ok');
-    var sheetName = wb.SheetNames.find(function(s){return s.toLowerCase().replace(/\s/g,'')===('rmrecive');}) || wb.SheetNames[0];
-    log('Using sheet: '+sheetName,'info');
-    var ws = wb.Sheets[sheetName];
-    var data = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    var rows = data.length;
-    log('✅ Parse สำเร็จ: '+rows+' rows | Headers: '+(data[0]?data[0].join(', '):'—'),'ok');
-    document.getElementById('spStatus').innerHTML='<span style="color:#00D68F">✅ ดึงข้อมูลสำเร็จ! '+rows+' แถว<br>Headers: '+(data[0]?data[0].join(' | '):'—')+'</span>';
-  })
-  .catch(function(e){
-    log('Error: '+e.message,'err');
+    log('HTTP '+r.status,r.ok?'ok':'err');
+    if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t.slice(0,400));});
+    return r.arrayBuffer();
+  }).then(function(buf){
+    log('Downloaded: '+buf.byteLength+' bytes — parsing xlsx...','ok');
+    var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    log('Sheets available: '+wb.SheetNames.join(' | '),'ok');
+    var sn=wb.SheetNames.find(function(s){return s.trim().toLowerCase().replace(/\s+/g,'')===('rmrecive');})||wb.SheetNames[0];
+    log('Reading sheet: '+sn,'info');
+    var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+    log('✅ สำเร็จ! '+rows.length+' rows | Headers: '+(rows[0]?rows[0].join(' | '):'—'),'ok');
+    document.getElementById('spStatus').innerHTML='<span style="color:#00D68F">✅ ดึงข้อมูลสำเร็จ!<br>'+rows.length+' แถว | Sheet: '+sn+'<br>Headers: '+(rows[0]?rows[0].join(' | '):'—')+'</span>';
+  }).catch(function(e){
+    log('❌ '+e.message,'err');
     document.getElementById('spStatus').innerHTML='<span style="color:#FF4757">❌ '+e.message+'</span>';
   });
 }

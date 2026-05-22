@@ -311,63 +311,48 @@ async function fetchRMReceive(){
       spError=spError||'ไม่ได้รับ Token — กรุณา Login ใหม่';
       spLoading=false; renderProcSection(); return;
     }
-    // Step 1: Get driveItem to find download URL
-    var itemRes = await fetch(
-      'https://graph.microsoft.com/v1.0/shares/'+SP_SHARE_ID+'/driveItem?$select=id,name,@microsoft.graph.downloadUrl,parentReference',
-      {headers:{Authorization:'Bearer '+token,Accept:'application/json'}}
+    if(typeof XLSX==='undefined'){ throw new Error('SheetJS ไม่พร้อม — reload หน้า'); }
+
+    // ── ดาวน์โหลดไฟล์ xlsx โดยตรงด้วย /content endpoint ─────────────
+    // SharePoint ไม่ให้ downloadUrl ใน metadata → ใช้ /content แทน
+    var contentRes = await fetch(
+      'https://graph.microsoft.com/v1.0/shares/'+SP_SHARE_ID+'/driveItem/content',
+      {headers:{Authorization:'Bearer '+token}}
     );
-    if(!itemRes.ok){ throw new Error('driveItem HTTP '+itemRes.status+': '+(await itemRes.text()).slice(0,300)); }
-    var item = await itemRes.json();
-    var buf = null;
-
-    // Step 2a: Try direct download URL (pre-auth)
-    var dlUrl = item['@microsoft.graph.downloadUrl'];
-    if(dlUrl){
-      var dlRes = await fetch(dlUrl);
-      if(!dlRes.ok) throw new Error('Download HTTP '+dlRes.status);
-      buf = await dlRes.arrayBuffer();
-    } else {
-      // Step 2b: Fallback — try workbook API via drives endpoint
-      var driveId = item.parentReference&&item.parentReference.driveId;
-      var itemId  = item.id;
-      if(driveId&&itemId){
-        var wbRes = await fetch(
-          'https://graph.microsoft.com/v1.0/drives/'+driveId+'/items/'+itemId+'/workbook/worksheets/rm%20recive/usedRange',
-          {headers:{Authorization:'Bearer '+token,Accept:'application/json'}}
-        );
-        if(!wbRes.ok) throw new Error('workbook HTTP '+wbRes.status+': '+(await wbRes.text()).slice(0,300));
-        var wbJson = await wbRes.json();
-        var vals = wbJson.values||[];
-        if(vals.length<2){spData=[];spLastFetch=new Date();}
-        else{
-          var hdrs=vals[0].map(function(h){return String(h).trim().toLowerCase();});
-          spData=vals.slice(1).filter(function(r){return r.some(function(c){return c!==null&&c!=='';});}).map(function(r){
-            var obj={};hdrs.forEach(function(h,i){obj[h]=r[i]!=null?String(r[i]).trim():'';});return obj;
-          });
-          spLastFetch=new Date();
-        }
-        spLoading=false; render(); return;
-      }
-      throw new Error('No downloadUrl and no driveId/itemId');
+    if(!contentRes.ok){
+      var errText = await contentRes.text();
+      throw new Error('HTTP '+contentRes.status+': '+errText.slice(0,400));
     }
+    var buf = await contentRes.arrayBuffer();
+    if(!buf||buf.byteLength<100){ throw new Error('ไฟล์ xlsx ว่างเปล่า ('+buf.byteLength+' bytes)'); }
 
-    // Step 3: Parse xlsx with SheetJS
-    if(typeof XLSX==='undefined') throw new Error('SheetJS ไม่พร้อม');
+    // ── Parse xlsx ────────────────────────────────────────────────────
     var wb = XLSX.read(new Uint8Array(buf),{type:'array'});
-    // Find the rm recive sheet (case-insensitive, ignore spaces)
+    // หา sheet "rm recive" (case-insensitive, ignore spaces)
     var sheetName = wb.SheetNames.find(function(s){
-      return s.toLowerCase().replace(/\s/g,'')===('rmrecive');
-    }) || wb.SheetNames[0];
+      return s.trim().toLowerCase().replace(/\s+/g,'') === 'rmrecive';
+    });
+    if(!sheetName){
+      // ไม่เจอ — ใช้ sheet แรกและ log ชื่อทั้งหมด
+      sheetName = wb.SheetNames[0];
+      console.warn('Sheet "rm recive" not found. Available:', wb.SheetNames);
+    }
     var ws = wb.Sheets[sheetName];
     var rawRows = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(rawRows.length<2){spData=[];spLastFetch=new Date();spLoading=false;render();return;}
-    var hdrs2 = rawRows[0].map(function(h){return String(h).trim().toLowerCase();});
-    spData = rawRows.slice(1).filter(function(r){return r.some(function(c){return c!=='';});}).map(function(r){
-      var obj={};hdrs2.forEach(function(h,i){obj[h]=String(r[i]||'').trim();});return obj;
-    });
-    spLastFetch=new Date();
+    if(rawRows.length < 2){ spData=[]; spLastFetch=new Date(); spLoading=false; render(); return; }
+
+    var hdrs = rawRows[0].map(function(h){ return String(h).trim().toLowerCase(); });
+    spData = rawRows.slice(1)
+      .filter(function(r){ return r.some(function(c){ return String(c).trim()!==''; }); })
+      .map(function(r){
+        var obj={};
+        hdrs.forEach(function(h,i){ obj[h]=String(r[i]||'').trim(); });
+        return obj;
+      });
+    spLastFetch = new Date();
+
   }catch(e){
-    spError=e.message;
+    spError = e.message;
     console.error('fetchRMReceive error:',e);
   }
   spLoading=false;
