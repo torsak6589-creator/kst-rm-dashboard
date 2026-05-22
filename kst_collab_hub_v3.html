@@ -239,6 +239,33 @@ const MSAL_CFG = {
 const SP_SCOPES = ['Files.Read','User.Read'];
 const SP_SHARE_ID = 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPUJRdWhIUA';
 const SP_SHEET   = 'rm%20recive';
+// ── RM-RECIVE Column Map (Procurement_Master_File.xlsx) ──────────────
+const RMCOL = {
+  supplier: 'รับวัตถุดิบทุกประเภท[ผู้ผลิต]',
+  date:     'รับวัตถุดิบทุกประเภท[วันที่กุ้งเข้า]',
+  farmCode: 'รับวัตถุดิบทุกประเภท[farm code]',
+  rmType:   'รับวัตถุดิบทุกประเภท[ประเภท rm]',
+  day:      'รับวัตถุดิบทุกประเภท[วัน]',
+  year:     'รับวัตถุดิบทุกประเภท[ปี]',
+  shrimpType:'รับวัตถุดิบทุกประเภท[ชนิดกุ้ง]',
+  size:     'รับวัตถุดิบทุกประเภท[ขนาด (bins)]',
+  month:    'รับวัตถุดิบทุกประเภท[month name]',
+  pondWt:   '[sumน้ำหนักหน้าบ่อ__กก__]',
+  buyWt:    '[น้ำหนักซื้อ_kg_]',
+  actualWt: '[น้ำหนักซื้อจริง]',
+  price:    '[ราคา_kst]',
+  cost:     '[มูลค่าซื้อ]',
+  avgPrice: '[ราคาเฉลี่ยถ่วงน้ำหนัก]',
+  avgSize:  '[ขนาดเฉลี่ยถ่วงน้ำหนัก]',
+};
+// Case-insensitive column getter
+function rmGet(row, colName){
+  if(!row) return '';
+  var cl = colName.toLowerCase();
+  var k = Object.keys(row).find(function(k){ return k.toLowerCase()===cl; });
+  return k ? (row[k]||'') : '';
+}
+function rmNum(row, colName){ return parseFloat(rmGet(row,colName))||0; }
 // SP_API: now uses download + SheetJS approach (workbook API not supported for this account type)
 
 let msalApp = null;
@@ -319,7 +346,7 @@ async function fetchRMReceive(){
 
     // Step 1: ค้นหาไฟล์ rm recive ใน drive
     var searchRes = await fetch(
-      "https://graph.microsoft.com/v1.0/drives/"+DRIVE_ID+"/root/search(q='rm recive')",
+      "https://graph.microsoft.com/v1.0/drives/"+DRIVE_ID+"/root/search(q='Procurement_Master_File')",
       {headers:{Authorization:'Bearer '+token,Accept:'application/json'}}
     );
 
@@ -327,8 +354,8 @@ async function fetchRMReceive(){
     if(searchRes.ok){
       var searchJson = await searchRes.json();
       var items = (searchJson.value||[]).filter(function(i){
-        return i.name && i.name.toLowerCase().indexOf('rm') >= 0 &&
-               (i.name.toLowerCase().indexOf('recive')>=0 || i.name.toLowerCase().indexOf('receive')>=0 || i.name.toLowerCase().indexOf('รับ')>=0);
+        var n=(i.name||'').toLowerCase();
+        return i.file && (n.indexOf('procurement_master')>=0 || n.indexOf('procurement master')>=0);
       });
       if(!items.length) items = (searchJson.value||[]).filter(function(i){return i.file&&i.name&&i.name.match(/\.xlsx?$/i);});
       if(items.length){ itemId = items[0].id; console.log('Found file:', items[0].name, 'id:', itemId); }
@@ -350,7 +377,7 @@ async function fetchRMReceive(){
     }
 
     if(!itemId){
-      throw new Error('ไม่พบไฟล์ rm recive ใน Drive — ตรวจสอบสิทธิ์การเข้าถึง drive หรือลอง Grant Admin Consent');
+      throw new Error('ไม่พบ Procurement_Master_File ใน Drive — ตรวจสอบ Drive ID หรือสิทธิ์ Files.Read');
     }
 
     // Step 3: ดาวน์โหลดไฟล์ xlsx
@@ -368,13 +395,16 @@ async function fetchRMReceive(){
     // ── Parse xlsx ────────────────────────────────────────────────────
     var wb = XLSX.read(new Uint8Array(buf),{type:'array'});
     // หา sheet "rm recive" (case-insensitive, ignore spaces)
+    // หา sheet RM-RECIVE (รองรับ rm recive / rm-recive / RM-RECIVE / RM RECIVE)
     var sheetName = wb.SheetNames.find(function(s){
-      return s.trim().toLowerCase().replace(/\s+/g,'') === 'rmrecive';
+      var n = s.trim().toLowerCase().replace(/[\s-]+/g,'');
+      return n === 'rmrecive' || n === 'rmreceive';
     });
     if(!sheetName){
-      // ไม่เจอ — ใช้ sheet แรกและ log ชื่อทั้งหมด
+      console.warn('Sheet "RM-RECIVE" not found. Available:', wb.SheetNames.join(', '));
       sheetName = wb.SheetNames[0];
-      console.warn('Sheet "rm recive" not found. Available:', wb.SheetNames);
+    } else {
+      console.log('Found sheet:', sheetName);
     }
     var ws = wb.Sheets[sheetName];
     var rawRows = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
@@ -400,27 +430,49 @@ async function fetchRMReceive(){
 
 // ─── Parse SP date value (Excel serial or string) ──────────────────
 function parseSpDate(val){
-  if(!val) return '';
-  // Excel serial number (days since 1899-12-30)
-  var n = parseFloat(val);
-  if(!isNaN(n) && n>40000){
+  if(!val||val==='') return '';
+  var s = String(val).trim();
+  // Excel serial number
+  var n = parseFloat(s);
+  if(!isNaN(n) && n>40000 && s.indexOf('/')===(-1)){
     var d = new Date(Date.UTC(1899,11,30) + n*864e5);
     return d.toISOString().slice(0,10);
   }
-  // Already string like "22/05/2026" or "2026-05-22"
-  return String(val).slice(0,10);
+  // Thai format: D/M/YYYY or DD/MM/YYYY  e.g. "24/1/2026" or "22/05/2026"
+  var thMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(thMatch){
+    var dd=thMatch[1].padStart(2,'0'), mm=thMatch[2].padStart(2,'0'), yyyy=thMatch[3];
+    return yyyy+'-'+mm+'-'+dd;
+  }
+  // ISO format: 2026-05-22
+  if(s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0,10);
+  return '';
 }
 
 // ─── Filter SP rows for a given date ─────────────────────────────
 function spForDate(dateStr){
-  if(!spData) return [];
+  if(!spData||!spData.length) return [];
+  // ตัวอย่าง column: "รับวัตถุดิบทุกประเภท[วันที่กุ้งเข้า]"
+  var sampleKeys = Object.keys(spData[0]);
+  // ใช้ exact column name จาก RMCOL
   return spData.filter(function(r){
-    var keys = Object.keys(r);
-    // Try common date column names
-    var dateCols = keys.filter(function(k){ return k.indexOf('วัน')>=0||k.indexOf('date')>=0||k==='d'||k==='วันที่'; });
-    if(!dateCols.length) dateCols=[keys[0]]; // fallback to first col
-    return dateCols.some(function(k){ return parseSpDate(r[k])===dateStr; });
+    var dateVal = rmGet(r, RMCOL.date);
+    return parseSpDate(dateVal) === dateStr;
   });
+}
+
+// Extract weight, farm, size from SP row (column mapping for Procurement_Master_File RM-RECIVE)
+function spGetNum(r, keywords){
+  var k = Object.keys(r).find(function(k){
+    return keywords.some(function(kw){ return k.toLowerCase().indexOf(kw)>=0; });
+  });
+  return k ? (parseFloat(r[k])||0) : 0;
+}
+function spGetStr(r, keywords){
+  var k = Object.keys(r).find(function(k){
+    return keywords.some(function(kw){ return k.toLowerCase().indexOf(kw)>=0; });
+  });
+  return k ? (r[k]||'') : '';
 }
 
 function renderProcSection(){
@@ -819,37 +871,56 @@ function renderSPWidget(){
   if(!rows) return '<div id="spSection">'+statusHtml+'</div>';
 
   // ── Today's summary
-  var totKg   = rows.reduce(function(a,r){ var keys=Object.keys(r); var wk=keys.find(function(k){return k.indexOf('น้ำหนัก')>=0||k.indexOf('weight')>=0||k.indexOf('kg')>=0||k==='wt';}); return a+(wk?parseFloat(r[wk])||0:0); },0);
-  var farms   = {};
-  var sizes   = {};
+  // Exact column mapping — Procurement_Master_File RM-RECIVE
+  var totKg   = rows.reduce(function(a,r){ return a + rmNum(r,RMCOL.buyWt); },0);
+  var totCost = rows.reduce(function(a,r){ return a + rmNum(r,RMCOL.cost); },0);
+  var farms={}, sizes={}, rmTypes={};
   rows.forEach(function(r){
-    var keys=Object.keys(r);
-    var fk = keys.find(function(k){return k.indexOf('farm')>=0||k.indexOf('ฟาร์ม')>=0||k.indexOf('รหัส')>=0||k==='farm_code'||k==='farm code';});
-    var sk = keys.find(function(k){return k.indexOf('size')>=0||k.indexOf('ขนาด')>=0||k.indexOf('size')>=0;});
-    var wk = keys.find(function(k){return k.indexOf('น้ำหนัก')>=0||k.indexOf('weight')>=0||k.indexOf('kg')>=0||k==='wt';});
-    var farm = fk?r[fk]:'?'; var sz = sk?r[sk]:'?'; var kg = wk?parseFloat(r[wk])||0:0;
-    farms[farm]=(farms[farm]||0)+kg;
-    sizes[sz]=(sizes[sz]||0)+kg;
+    var farm = rmGet(r,RMCOL.farmCode)||rmGet(r,RMCOL.supplier);
+    var sz   = rmGet(r,RMCOL.size);
+    var rmt  = rmGet(r,RMCOL.rmType);
+    var kg   = rmNum(r,RMCOL.buyWt);
+    if(farm) farms[farm]=(farms[farm]||0)+kg;
+    if(sz)   sizes[sz]=(sizes[sz]||0)+kg;
+    if(rmt)  rmTypes[rmt]=(rmTypes[rmt]||0)+kg;
   });
 
   // KPI summary
+  var avgPx = totKg>0?(totCost/totKg).toFixed(2):'—';
   var kpiHtml = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
-    MC('รับ RM วันที่ '+dateToShow, rows.length, 'รายการ', '#00D68F')+
-    MC('น้ำหนักรวม', fmt(totKg,1), 'kg', '#FFB800', Object.keys(farms).length+' ฟาร์ม')+
-    MC('ฟาร์ม/Supplier', Object.keys(farms).length, 'ราย', '#7B61FF')+
+    MC('รับ RM ('+dateToShow+')', rows.length, 'รายการ', '#00D68F', Object.keys(farms).length+' ฟาร์ม')+
+    MC('น้ำหนักซื้อรวม', fmt(totKg,1), 'kg', '#FFB800')+
+    MC('มูลค่าซื้อ', '฿'+fmt(Math.round(totCost/1000))+'K', 'THB', '#FF4757')+
+    MC('ราคาเฉลี่ย', avgPx, '฿/kg', '#7B61FF')+
     '</div>';
 
   // Size breakdown bar
-  var szKeys = Object.keys(sizes).filter(function(k){return k&&k!=='?';});
-  var szBarHtml = szKeys.length?'<div style="margin-bottom:10px">'+
-    '<div style="font-size:9px;color:#6B7A8D;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">น้ำหนักแยกขนาด (kg)</div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-    szKeys.sort().map(function(sz){
-      return '<div style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:6px 10px;text-align:center;min-width:80px">'+
-        '<div style="font-size:10px;color:#00E5FF;font-weight:700">'+esc(sz)+'</div>'+
-        '<div style="font-family:JetBrains Mono,monospace;font-weight:700;color:#E8ECF1;font-size:13px">'+fmt(sizes[sz],1)+'</div>'+
-        '<div style="font-size:9px;color:#6B7A8D">kg</div></div>';
-    }).join('')+'</div></div>':'';
+  // Farm breakdown
+  var farmKeys = Object.keys(farms).filter(function(k){return k&&k!=='?';}).sort(function(a,b){return farms[b]-farms[a];});
+  var szBarHtml = '';
+  // RM Type pills
+  var rmTypeKeys = Object.keys(rmTypes).filter(function(k){return k;});
+  if(rmTypeKeys.length){
+    szBarHtml += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
+      rmTypeKeys.map(function(t){
+        return '<span style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:18px;padding:3px 10px;font-size:10px;color:#00E5FF">'+
+          esc(t)+' <b style="font-family:JetBrains Mono,monospace">'+fmt(rmTypes[t],0)+' kg</b></span>';
+      }).join('')+'</div>';
+  }
+  // Farm weight bars (top 8)
+  if(farmKeys.length){
+    var maxFarmKg = farmKeys.reduce(function(a,k){return Math.max(a,farms[k]);},0);
+    szBarHtml += '<div style="margin-bottom:10px">'+
+      '<div style="font-size:9px;color:#6B7A8D;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">น้ำหนักแยกฟาร์ม (kg)</div>'+
+      farmKeys.slice(0,8).map(function(farm){
+        var pct2=maxFarmKg>0?Math.round(farms[farm]/maxFarmKg*100):0;
+        return '<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">'+
+          '<span style="font-weight:600;color:#E8ECF1">'+esc(farm)+'</span>'+
+          '<span style="font-family:JetBrains Mono,monospace;color:#FFB800;font-size:10px">'+fmt(farms[farm],1)+' kg</span></div>'+
+          '<div style="background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden">'+
+          '<div style="width:'+pct2+'%;background:#FFB800;height:100%;border-radius:3px;transition:width .5s"></div></div></div>';
+      }).join('')+'</div>';
+  }
 
   // Rows table — dynamic columns from first row
   var tableHtml = '';
@@ -858,7 +929,17 @@ function renderSPWidget(){
     // Put date-like first, skip empty cols
     var dateKeys = allKeys.filter(function(k){return k.indexOf('วัน')>=0||k.indexOf('date')>=0;});
     var otherKeys = allKeys.filter(function(k){return dateKeys.indexOf(k)<0;});
-    var colOrder = dateKeys.concat(otherKeys).filter(function(k){return rows.some(function(r){return r[k]&&r[k]!=='';});}).slice(0,12);
+    // Priority columns first for RM-RECIVE sheet
+    // Display columns: exact order for RM-RECIVE
+    var wantedCols = [RMCOL.date,RMCOL.farmCode,RMCOL.supplier,RMCOL.rmType,RMCOL.shrimpType,
+                      RMCOL.size,RMCOL.buyWt,RMCOL.actualWt,RMCOL.price,RMCOL.cost,RMCOL.avgPrice];
+    var shownCols = [];
+    wantedCols.forEach(function(wc){
+      var k = Object.keys(rows[0]||{}).find(function(k){return k.toLowerCase()===wc.toLowerCase();});
+      if(k && rows.some(function(r){return r[k]&&r[k]!=='';}) && shownCols.indexOf(k)<0) shownCols.push(k);
+    });
+    // fallback to auto-detected cols if wanted not found
+    colOrder = shownCols.length>=3 ? shownCols : colOrder.slice(0,10);
 
     var rowsHtml = rows.map(function(r,i){
       return '<tr>'+colOrder.map(function(k){
