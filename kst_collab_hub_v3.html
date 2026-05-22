@@ -418,9 +418,23 @@ async function fetchRMReceive(){
     if(rawRows.length < 2){ spData=[]; spLastFetch=new Date(); spLoading=false; render(); return; }
 
     spDebug.rawRows = rawRows.length;
-    spDebug.firstRowSample = rawRows[0]?rawRows[0].slice(0,5).join(' | '):'empty';
-    var hdrs = rawRows[0].map(function(h){ return String(h).trim().toLowerCase(); });
-    spData = rawRows.slice(1)
+    spDebug.firstRowSample = rawRows[0]?rawRows[0].slice(0,4).join(' | '):'empty';
+
+    // ── Smart Header Row Detection ────────────────────────────────────
+    // row 0 อาจเป็น metadata เช่น "data returned for 2024."
+    // ค้นหา row ที่มี Thai keywords ที่รู้จัก
+    var HKWS = ['วันที่กุ้งเข้า','farm code','ผู้ผลิต','น้ำหนักซื้อ','ประเภท rm','ขนาด'];
+    var hdrIdx = 0; // default row 0
+    for(var ri=0; ri<Math.min(20, rawRows.length); ri++){
+      var rs = rawRows[ri].join('|').toLowerCase();
+      var hits = HKWS.filter(function(kw){ return rs.indexOf(kw)>=0; });
+      if(hits.length >= 2){ hdrIdx = ri; break; }
+    }
+    spDebug.headerRowIdx = hdrIdx;
+    spDebug.headerRowSample = rawRows[hdrIdx]?rawRows[hdrIdx].slice(0,4).join(' | '):'empty';
+
+    var hdrs = rawRows[hdrIdx].map(function(h){ return String(h).trim().toLowerCase(); });
+    spData = rawRows.slice(hdrIdx + 1)
       .filter(function(r){ return r.some(function(c){ return String(c).trim()!==''; }); })
       .map(function(r){
         var obj={};
@@ -981,14 +995,12 @@ function renderSPWidget(){
     var debugHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">'+
       '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
       '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.8">'+
-      'File: <b style="color:#E8ECF1">'+(spDebug.fileName||'?')+'</b> &nbsp; '+
-      'Size: <b style="color:#E8ECF1">'+(spDebug.fileSize?Math.round(spDebug.fileSize/1024)+'KB':'?')+'</b><br>'+
-      'Sheets found: <span style="color:#7B61FF">'+(spDebug.allSheets?spDebug.allSheets.join(' | '):'?')+'</span><br>'+
-      'Sheet used: <b style="color:#00E5FF">'+(spDebug.sheetFound||'?')+'</b><br>'+
-      'Raw rows: <b style="color:#E8ECF1">'+(spDebug.rawRows!=null?spDebug.rawRows:'?')+'</b> &nbsp; '+
-      'First row: <span style="color:#FFB800">'+(spDebug.firstRowSample||'?')+'</span><br>'+
-      'Parsed rows (spData): <b style="color:'+(totalSpRows>0?'#00D68F':'#FF4757')+'">'+totalSpRows+'</b> &nbsp; '+
-      'Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b>'+
+      'File: <b style="color:#E8ECF1">'+(spDebug.fileName||'?')+'</b> &nbsp; Size: <b style="color:#E8ECF1">'+(spDebug.fileSize?Math.round(spDebug.fileSize/1024)+'KB':'?')+'</b><br>'+
+      'Sheets: <span style="color:#7B61FF">'+(spDebug.allSheets?spDebug.allSheets.join(' | '):'?')+'</span><br>'+
+      'Sheet used: <b style="color:#00E5FF">'+(spDebug.sheetFound||'?')+'</b> &nbsp; Raw rows: <b style="color:#E8ECF1">'+(spDebug.rawRows!=null?spDebug.rawRows:'?')+'</b><br>'+
+      'Row 0 (actual): <span style="color:#FF4757">'+(spDebug.firstRowSample||'?')+'</span><br>'+
+      'Header row idx: <b style="color:#FFB800">'+(spDebug.headerRowIdx!=null?spDebug.headerRowIdx:'?')+'</b> &nbsp; Header: <span style="color:#00D68F">'+(spDebug.headerRowSample||'?')+'</span><br>'+
+      'Parsed (spData): <b style="color:'+(totalSpRows>0?'#00D68F':'#FF4757')+'">'+totalSpRows+'</b> &nbsp; Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b>'+
       '</div></div>';
     var hintHtml = recentDates.length?
       '<div style="margin-top:8px;font-size:11px;color:#6B7A8D;text-align:left">วันที่มีข้อมูลล่าสุด: '+
