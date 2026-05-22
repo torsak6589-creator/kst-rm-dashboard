@@ -339,11 +339,13 @@ async function fetchRMReceive(){
       spLoading=false; renderProcSection(); return;
     }
     if(typeof XLSX==='undefined'){ throw new Error('SheetJS ไม่พร้อม — reload หน้า'); }
+    spDebug.xlsxLoaded = true;
 
     // ── ค้นหาไฟล์จาก Drive โดยตรง (Files.Read — ไม่ต้อง admin consent) ──
     // Drive ID จาก kst_rm_v16.html (SharePoint KSTRMUPDATEV2 drive)
     var DRIVE_ID = 'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK';
 
+    spDebug = {step:'searching', token:'ok'};
     // Step 1: ค้นหาไฟล์ rm recive ใน drive
     var searchRes = await fetch(
       "https://graph.microsoft.com/v1.0/drives/"+DRIVE_ID+"/root/search(q='Procurement_Master_File')",
@@ -358,7 +360,7 @@ async function fetchRMReceive(){
         return i.file && (n.indexOf('procurement_master')>=0 || n.indexOf('procurement master')>=0);
       });
       if(!items.length) items = (searchJson.value||[]).filter(function(i){return i.file&&i.name&&i.name.match(/\.xlsx?$/i);});
-      if(items.length){ itemId = items[0].id; console.log('Found file:', items[0].name, 'id:', itemId); }
+      if(items.length){ itemId = items[0].id; spDebug.fileName=items[0].name; console.log('Found file:', items[0].name, 'id:', itemId); }
     }
 
     // Step 2: ถ้าหาไม่เจอ — ลอง list root children
@@ -381,6 +383,7 @@ async function fetchRMReceive(){
     }
 
     // Step 3: ดาวน์โหลดไฟล์ xlsx
+    spDebug.step = 'downloading';
     var contentRes = await fetch(
       'https://graph.microsoft.com/v1.0/drives/'+DRIVE_ID+'/items/'+itemId+'/content',
       {headers:{Authorization:'Bearer '+token}}
@@ -390,16 +393,20 @@ async function fetchRMReceive(){
       throw new Error('Download HTTP '+contentRes.status+': '+errText.slice(0,400));
     }
     var buf = await contentRes.arrayBuffer();
+    spDebug.fileSize = buf.byteLength;
+    spDebug.step = 'parsing';
     if(!buf||buf.byteLength<100){ throw new Error('ไฟล์ xlsx ว่างเปล่า ('+buf.byteLength+' bytes)'); }
 
     // ── Parse xlsx ────────────────────────────────────────────────────
     var wb = XLSX.read(new Uint8Array(buf),{type:'array'});
     // หา sheet "rm recive" (case-insensitive, ignore spaces)
-    // หา sheet RM-RECIVE (รองรับ rm recive / rm-recive / RM-RECIVE / RM RECIVE)
+    // หา sheet RM-RECIVE
     var sheetName = wb.SheetNames.find(function(s){
       var n = s.trim().toLowerCase().replace(/[\s-]+/g,'');
       return n === 'rmrecive' || n === 'rmreceive';
     });
+    spDebug.allSheets = wb.SheetNames;
+    spDebug.sheetFound = sheetName || '(not found → using '+wb.SheetNames[0]+')';
     if(!sheetName){
       console.warn('Sheet "RM-RECIVE" not found. Available:', wb.SheetNames.join(', '));
       sheetName = wb.SheetNames[0];
@@ -410,6 +417,8 @@ async function fetchRMReceive(){
     var rawRows = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
     if(rawRows.length < 2){ spData=[]; spLastFetch=new Date(); spLoading=false; render(); return; }
 
+    spDebug.rawRows = rawRows.length;
+    spDebug.firstRowSample = rawRows[0]?rawRows[0].slice(0,5).join(' | '):'empty';
     var hdrs = rawRows[0].map(function(h){ return String(h).trim().toLowerCase(); });
     spData = rawRows.slice(1)
       .filter(function(r){ return r.some(function(c){ return String(c).trim()!==''; }); })
@@ -970,19 +979,23 @@ function renderSPWidget(){
     var recentDates = availDates2.slice(-5).reverse();
     // Debug box
     var debugHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">'+
-      '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">⚠ DEBUG INFO</div>'+
-      '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.7">'+
-      'Total rows loaded: <b style="color:#E8ECF1">'+totalSpRows+'</b><br>'+
-      'Available dates: <b style="color:#E8ECF1">'+availDates2.length+'</b> unique dates<br>'+
-      'Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b><br>'+
-      'Sample cols: <span style="color:#7B61FF">'+esc(sampleCols)+'</span>'+
+      '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
+      '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.8">'+
+      'File: <b style="color:#E8ECF1">'+(spDebug.fileName||'?')+'</b> &nbsp; '+
+      'Size: <b style="color:#E8ECF1">'+(spDebug.fileSize?Math.round(spDebug.fileSize/1024)+'KB':'?')+'</b><br>'+
+      'Sheets found: <span style="color:#7B61FF">'+(spDebug.allSheets?spDebug.allSheets.join(' | '):'?')+'</span><br>'+
+      'Sheet used: <b style="color:#00E5FF">'+(spDebug.sheetFound||'?')+'</b><br>'+
+      'Raw rows: <b style="color:#E8ECF1">'+(spDebug.rawRows!=null?spDebug.rawRows:'?')+'</b> &nbsp; '+
+      'First row: <span style="color:#FFB800">'+(spDebug.firstRowSample||'?')+'</span><br>'+
+      'Parsed rows (spData): <b style="color:'+(totalSpRows>0?'#00D68F':'#FF4757')+'">'+totalSpRows+'</b> &nbsp; '+
+      'Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b>'+
       '</div></div>';
     var hintHtml = recentDates.length?
       '<div style="margin-top:8px;font-size:11px;color:#6B7A8D;text-align:left">วันที่มีข้อมูลล่าสุด: '+
         recentDates.map(function(d){
           return '<button onclick="filterDate=\'' + d + '\';renderProcSection();" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:2px 8px;color:#00E5FF;font-size:11px;cursor:pointer;margin:2px">' + d + '</button>';
         }).join('')+'</div>':'';
-    tableHtml = (totalSpRows>0?debugHtml:'')+
+    tableHtml = debugHtml+
       '<div style="color:#6B7A8D;text-align:center;padding:12px;font-size:12px">'+
       (dateToShow?'ไม่มีรายการรับ RM วันที่ <b style="color:#E8ECF1">'+dateToShow+'</b>':
        (totalSpRows===0?'ไม่มีข้อมูลใน SharePoint — ตรวจสอบชื่อ Sheet':'ไม่มีข้อมูล (กด วันที่มีข้อมูล ด้านล่าง)'))+
