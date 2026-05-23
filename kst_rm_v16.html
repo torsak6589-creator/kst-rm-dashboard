@@ -463,8 +463,8 @@ const CFG1 = {
   sheet: 'RM RECORD',
 };
 const CFG2 = {
-  driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
-  fileId: '014NXMQUGBFDXECACTW5B22HRFO4URYIHF',
+  driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
+  fileId: '015324WXPDOOQEKDGMYNCJEIE64EYHHBDD',
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPWNvVkhGcA',
   tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPWNvVkhGcA',
   sheetPlan:    'PLAN_DAILY',
@@ -752,7 +752,10 @@ async function loadAll(){
           newA.push({month:MO[m]||m,type:String(r[1]).trim(),planVol:sn(r[2]),actVol:sn(r[3]),actVal:sn(r[4]),avgPrice:Math.round(sn(r[6])*100)/100,kpiPct:kpiPct});
         }
       }
-      if(newA.length>0) actualData=newA;
+              if(newA.length>0){
+          actualData=newA;
+          console.log('[KST] ✅ Live ACTUAL_TRACKING:',newA.length,'records, YTD',newA.reduce((s,x)=>s+(x.actVol||0),0).toLocaleString());
+        }
     }catch(e){ console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
 
     // ── ราคา RM คิดขาย ──
@@ -791,7 +794,15 @@ async function loadAll(){
           newPrice.push([month, week, size, wf, wl, bf, bl]);
         }
         if(newPrice.length > 0){
-          priceData = newPrice;
+          const liveMonths = new Set(newPrice.map(r=>r[0])).size;
+          const snapMonths = new Set((STATIC_PRICE||[]).map(r=>r[0])).size;
+          if(liveMonths >= snapMonths){
+            priceData = newPrice;
+            console.log('[KST] ✅ Live PRICE accepted: '+liveMonths+' months');
+          } else {
+            console.warn('[KST] Live PRICE only '+liveMonths+' months < Snapshot '+snapMonths+' → using Snapshot');
+            priceData = STATIC_PRICE;
+          }
           console.log('[KST] ✅ ราคา RM คิดขาย live:', newPrice.length, 'rows');
           _renderTab4(); // refresh Tab4 with live data
         }
