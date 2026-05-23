@@ -744,10 +744,12 @@ async function loadAll(){
         const m=String(r[0]).trim();
         if(!MONTHS.includes(m))continue;
         if(!String(r[1]||'').includes('กุ้ง'))continue;
-        const yr=typeof r[8]==='number'?Math.round(r[8]):0;
+        const yr=Number(r[8])||0;
         if(yr===2026){
           const sn=v=>{try{return parseFloat(v||0)}catch{return 0}};
-          newA.push({month:MO[m]||m,type:String(r[1]).trim(),planVol:sn(r[2]),actVol:sn(r[3]),actVal:sn(r[4]),avgPrice:Math.round(sn(r[6])*100)/100,kpiPct:Math.round(sn(r[7])*10000)/100});
+          const kpiRaw=sn(r[7]);
+          const kpiPct=kpiRaw>1?Math.round(kpiRaw*100)/100:Math.round(kpiRaw*10000)/100;
+          newA.push({month:MO[m]||m,type:String(r[1]).trim(),planVol:sn(r[2]),actVol:sn(r[3]),actVal:sn(r[4]),avgPrice:Math.round(sn(r[6])*100)/100,kpiPct:kpiPct});
         }
       }
       if(newA.length>0) actualData=newA;
