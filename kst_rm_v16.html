@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KST RM">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#C8982A">
+<meta name="theme-color" content="#B5780A">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KST — Procurement Dashboard</title>
@@ -16,20 +16,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --navy:#0D1B2E;--navy2:#132340;--navy3:#1A2E50;
-  --gold:#C8982A;--gold-lt:#E5B84A;--gold-dim:rgba(200,152,42,.14);
-  --cyan:#00BCD4;--green:#00C897;--red:#FF4757;--amber:#FFB800;
-  --text:#E8ECF1;--muted:#7A8CA3;--border:rgba(200,152,42,.18);
-  --card:rgba(19,35,64,.85);--r:12px;
+  --navy:#F4F6F9;--navy2:#EAECF0;--navy3:#DDE1E8;
+  --gold:#B5780A;--gold-lt:#8B5E08;--gold-dim:rgba(181,120,10,.10);
+  --cyan:#0277BD;--green:#00897B;--red:#D32F2F;--amber:#E65100;
+  --text:#1A202C;--muted:#4A5568;--border:rgba(0,0,0,.12);
+  --card:rgba(255,255,255,.95);--r:12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--navy);color:var(--text);font-family:"Space Grotesk","Noto Sans Thai",sans-serif;font-size:14px;min-height:100vh}
+html,body{background:#F0F2F5;color:var(--text);font-family:"Space Grotesk","Noto Sans Thai",sans-serif;font-size:14px;min-height:100vh}
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 60% 40% at 10% 20%,rgba(200,152,42,.06) 0,transparent 60%),
-             radial-gradient(ellipse 50% 50% at 90% 80%,rgba(0,188,212,.05) 0,transparent 60%)}
+  background:radial-gradient(ellipse 60% 40% at 10% 20%,rgba(181,120,10,.04) 0,transparent 60%),
+             radial-gradient(ellipse 50% 50% at 90% 80%,rgba(2,119,189,.03) 0,transparent 60%)}
 
 /* ── AUTH ── */
-#authScreen{position:fixed;inset:0;z-index:999;background:rgba(13,27,46,.97);
+#authScreen{position:fixed;inset:0;z-index:999;background:rgba(240,242,245,.98);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
 .auth-logo{width:72px;height:72px;border-radius:14px;overflow:hidden;box-shadow:0 0 28px rgba(200,152,42,.4)}
 .auth-logo img{width:100%;height:100%;object-fit:cover}
@@ -45,11 +45,11 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 /* ── TOPBAR ── */
 .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;
   justify-content:space-between;padding:10px 22px;
-  background:rgba(13,27,46,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(10px)}
+  background:rgba(255,255,255,.97);border-bottom:1px solid rgba(0,0,0,.10);backdrop-filter:blur(10px);box-shadow:0 1px 8px rgba(0,0,0,.08)}
 .brand{display:flex;align-items:center;gap:10px}
 .brand-logo{width:38px;height:38px;border-radius:7px;overflow:hidden}
 .brand-logo img{width:100%;height:100%;object-fit:cover}
-.brand-name{font-size:15px;font-weight:700;color:var(--gold-lt)}
+.brand-name{font-size:15px;font-weight:700;color:var(--gold)}
 .brand-sub{font-size:9px;color:var(--muted)}
 .hdr-mid{font-size:13px;font-weight:600;text-align:center}
 .hdr-mid span{display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px}
@@ -988,7 +988,7 @@ function _rb(cid,key,cfg){if(charts[key])charts[key].destroy();charts[key]=new C
 function _dailyChart(){
   const m={};filteredRM.forEach(r=>{if(!m[r.date])m[r.date]={l:0,d:0};r.typeRM.includes('เป็น')?m[r.date].l+=r.weight:m[r.date].d+=r.weight;});
   const L=Object.keys(m).sort();
-  _rb('cDaily','daily',{type:'bar',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>m[d].l),backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},{label:'กุ้งดอง',data:L.map(d=>m[d].d),backgroundColor:'rgba(0,188,212,.65)',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:15,color:'#7A8CA3',font:{size:9}}},y:{stacked:true,grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cDaily','daily',{type:'bar',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>m[d].l),backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},{label:'กุ้งดอง',data:L.map(d=>m[d].d),backgroundColor:'rgba(0,188,212,.65)',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:15,color:'#7A8CA3',font:{size:9}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
 }
 function _typeDonut(){
   const t={};filteredRM.forEach(r=>{const k=r.typeRM.includes('เป็น')?'กุ้งเป็น':'กุ้งดอง';t[k]=(t[k]||0)+r.weight;});
@@ -1000,7 +1000,7 @@ function _typeDonut(){
 function _priceChart(){
   const m={};filteredRM.forEach(r=>{if(!r.price||!r.date)return;const k=r.typeRM.includes('เป็น')?'l':'d';if(!m[r.date])m[r.date]={l:[],d:[]};m[r.date][k].push(r.price);});
   const L=Object.keys(m).sort(),avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
-  _rb('cPrice','price',{type:'line',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>avg(m[d].l)),borderColor:'#C8982A',backgroundColor:'rgba(200,152,42,.08)',tension:.4,fill:true,pointRadius:0,spanGaps:true},{label:'กุ้งดอง',data:L.map(d=>avg(m[d].d)),borderColor:'#00BCD4',backgroundColor:'rgba(0,188,212,.06)',tension:.4,fill:true,pointRadius:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:12,color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cPrice','price',{type:'line',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>avg(m[d].l)),borderColor:'#C8982A',backgroundColor:'rgba(200,152,42,.08)',tension:.4,fill:true,pointRadius:0,spanGaps:true},{label:'กุ้งดอง',data:L.map(d=>avg(m[d].d)),borderColor:'#00BCD4',backgroundColor:'rgba(0,188,212,.06)',tension:.4,fill:true,pointRadius:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:12,color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
 }
 function _supBarChart(){
   const m={};filteredRM.forEach(r=>{m[r.supplier]=(m[r.supplier]||0)+r.weight;});
@@ -1059,8 +1059,8 @@ function _renderSizePrice(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}
       }}
   });
 
@@ -1087,8 +1087,8 @@ function _renderSizePrice(){
         tooltip:{callbacks:{label:ctx=>'฿ '+parseFloat(ctx.raw).toFixed(0)+'/กก.'}}
       },
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿ '+v,color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>'฿ '+v,color:'#7A8CA3',font:{size:9}}}
       }}
   });
 
@@ -1167,10 +1167,10 @@ function _renderTab2(fr,to,ty,sp){
         {label:'กุ้งดอง', data:Lp.map(d=>md[d].broker),backgroundColor:'rgba(0,188,212,.65)',borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},
+      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
       scales:{
-        x:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
-        y:{stacked:true,grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}
+        x:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},
+        y:{stacked:true,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}
       }}});
 
   /* Type donut */
@@ -1218,12 +1218,12 @@ function _renderTab3(ty,sp){
   const mplan={},mact={};
   filtAct.forEach(d=>{mplan[d.month]=(mplan[d.month]||0)+d.planVol;mact[d.month]=(mact[d.month]||0)+d.actVol;});
   const Lm=months.filter(m=>mplan[m]||mact[m]);
-  _rb('cActMonth','actM',{type:'bar',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:[{label:'แผน',data:Lm.map(m=>mplan[m]||0),backgroundColor:'rgba(200,152,42,.5)',borderRadius:3},{label:'จริง',data:Lm.map(m=>mact[m]||0),backgroundColor:'rgba(0,200,151,.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cActMonth','actM',{type:'bar',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:[{label:'แผน',data:Lm.map(m=>mplan[m]||0),backgroundColor:'rgba(200,152,42,.5)',borderRadius:3},{label:'จริง',data:Lm.map(m=>mact[m]||0),backgroundColor:'rgba(0,200,151,.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
   // Price line
   const mPrice={};filtAct.forEach(d=>{if(!mPrice[d.month])mPrice[d.month]={};mPrice[d.month][d.type]=d.avgPrice;});
   const types=[...new Set(filtAct.map(d=>d.type))];
   const TC=['#C8982A','#00BCD4','#00C897'];
-  _rb('cActPrice','actP',{type:'line',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:types.map((t,i)=>{return{label:t,data:Lm.map(m=>(mPrice[m]&&mPrice[m][t])||null),borderColor:TC[i%3],backgroundColor:TC[i%3]+'22',tension:.4,fill:false,pointRadius:3,spanGaps:true};})  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cActPrice','actP',{type:'line',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:types.map((t,i)=>{return{label:t,data:Lm.map(m=>(mPrice[m]&&mPrice[m][t])||null),borderColor:TC[i%3],backgroundColor:TC[i%3]+'22',tension:.4,fill:false,pointRadius:3,spanGaps:true};})  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
   // Table
   const actRows=filtAct.filter(d=>d.actVol>0||d.planVol>0);
   document.getElementById('actBody').innerHTML=actRows.map(d=>{
@@ -1335,10 +1335,10 @@ function _renderTab5(){
         {label:'ราคาคาดการณ์',data:trendForecast,borderColor:'#00BCD4',tension:.3,borderDash:[5,3],pointRadius:0,spanGaps:true}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},
+      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:8},maxRotation:45}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:8},maxRotation:45}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
       }}});
 
   // Size chart — avg price by size this month
@@ -1361,10 +1361,10 @@ function _renderTab5(){
         {label:'ราคาคาดการณ์',data:sizeForecast,backgroundColor:'rgba(0,188,212,.5)',borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},
+      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:8},maxRotation:45}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:8},maxRotation:45}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
       }}});
 
   // Table
@@ -1441,10 +1441,10 @@ function _renderTab4(){
         {label:'กุ้งดำสด',  data:sizeData.map(r=>r[5]||null),backgroundColor:'rgba(0,200,151,.65)', borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},
+      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:8},maxRotation:45}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:8},maxRotation:45}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
       }}});
 
   // Trend chart — size 58-60 over months
@@ -1466,10 +1466,10 @@ function _renderTab4(){
         {label:'กุ้งดำสด', data:trendBF,borderColor:'#00C897',tension:.4,pointRadius:4,spanGaps:true}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#7A8CA3'}}},
+      plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
       scales:{
-        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7A8CA3',font:{size:9}}},
-        y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},
+        y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>'฿'+v,color:'#7A8CA3',font:{size:9}}}
       }}});
 
   // Table
