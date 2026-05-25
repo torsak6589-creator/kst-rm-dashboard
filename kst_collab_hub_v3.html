@@ -841,303 +841,18 @@ function renderPlanning(){
 }
 
 
-// ── SHAREPOINT RM RECEIVE WIDGET ─────────────────────────────────
-function renderSPWidget(){
-  var dbg = typeof spDebug !== 'undefined' ? spDebug : {};
-  var dateToShow = filterDate; // empty = ทั้งหมด
-  // SP section uses its own date filter (independent of page filter)
-  var spDate = spFilterDate || dateToShow || '';
-  var baseRows = spData ? (spDate ? spForDate(spDate) : spData.slice()) : null;
-  var rows = baseRows ? baseRows.filter(function(r){
-    if(spFilterRmType && rmGet(r,RMCOL.rmType).toLowerCase().indexOf(spFilterRmType.toLowerCase()) < 0) return false;
-    if(spFilterShrimp && rmGet(r,RMCOL.shrimpType).toLowerCase().indexOf(spFilterShrimp.toLowerCase()) < 0) return false;
-    return true;
-  }) : null;
-
-  // ── Status bar
-  var statusHtml = '';
-  if(spLoading){
-    statusHtml = '<div style="display:flex;align-items:center;gap:8px;padding:10px;color:#FFB800;font-size:12px"><span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> กำลังดึงข้อมูลจาก SharePoint...</div>';
-  } else if(spError){
-    var errContent = '';
-    if(spError==='redirect_uri_mismatch'){
-      var curUri = window.location.href.split('?')[0];
-      errContent = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:14px 16px">'+
-        '<div style="font-weight:700;color:#FF4757;font-size:13px;margin-bottom:8px">⚠ Redirect URI ยังไม่ได้ลงทะเบียนใน Azure AD</div>'+
-        '<div style="color:#E8ECF1;font-size:12px;margin-bottom:10px">ต้องเพิ่ม URL นี้ในหน้า App Registration:</div>'+
-        '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 12px;font-family:JetBrains Mono,monospace;font-size:11px;color:#FFB800;word-break:break-all;margin-bottom:10px">'+esc(curUri)+'</div>'+
-        '<div style="font-size:11px;color:#6B7A8D;margin-bottom:10px">'+
-          '<b style="color:#E8ECF1">วิธีแก้:</b> Azure Portal → App Registrations → <b style="color:#00E5FF">2459a57b</b> → Authentication → Add platform → Single-page app → วาง URL ด้านบน → Save'+
-        '</div>'+
-        '<div style="display:flex;gap:8px">'+
-          '<button id="btnCopyUri" class="btn btn-c btn-sm">📋 Copy URI</button>'+
-          '<a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/2459a57b-bd24-4c19-8f82-1b1d607bd11a" target="_blank" class="btn btn-w btn-sm" style="text-decoration:none">🔗 เปิด Azure Portal</a>'+
-          '<button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองใหม่</button>'+
-        '</div>'+
-      '</div>';
-    } else if(spError==='popup_blocked'){
-      errContent = '<div style="background:rgba(255,184,0,0.08);border:1px solid rgba(255,184,0,0.3);border-radius:10px;padding:14px 16px">'+
-        '<div style="font-weight:700;color:#FFB800;font-size:13px;margin-bottom:8px">⚠ Browser บล็อก Popup</div>'+
-        '<div style="color:#E8ECF1;font-size:12px;margin-bottom:10px">กรุณาอนุญาต Popup สำหรับหน้านี้ หรือใช้ Redirect Login:</div>'+
-        '<div style="display:flex;gap:8px">'+
-          '<button id="btnSPRedirect" class="btn btn-w btn-sm">🔐 Login แบบ Redirect</button>'+
-          '<button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองอีกครั้ง (Popup)</button>'+
-        '</div>'+
-        '<div style="font-size:10px;color:#6B7A8D;margin-top:6px">แนะนำ: กด Allow popup ที่แถบ URL แล้วกด ลองอีกครั้ง</div>'+
-      '</div>';
-    } else {
-      errContent = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:12px 14px">'+
-        '<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ เกิดข้อผิดพลาด</div>'+
-        '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;word-break:break-all;margin-bottom:8px">'+esc(spError)+'</div>'+
-        '<button id="btnSPRetry" class="btn btn-e btn-sm">↺ ลองใหม่</button>'+
-      '</div>';
-    }
-    statusHtml = errContent;
-  } else if(!spData){
-    statusHtml = '<div style="padding:12px;text-align:center"><button id="btnSPFetch" class="btn btn-c" style="gap:8px">🔄 ดึงข้อมูล RM Receive จาก SharePoint</button><div style="color:#6B7A8D;font-size:10px;margin-top:6px">เชื่อมต่อ ksthatyai365 SharePoint | sheet: rm recive</div></div>';
-  } else {
-    var lastFetchStr = spLastFetch?spLastFetch.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
-    var totalRows = spData?spData.length:0;
-    var allDates2 = spData?[...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(Boolean))].sort():[];
-    var latestDate = allDates2.length?allDates2[allDates2.length-1]:'—';
-    statusHtml = '<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:6px 0;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px;flex-wrap:wrap">'+
-      '<span style="color:#00D68F">●</span>'+
-      '<span style="color:#6B7A8D">SharePoint RM Receive | ดึงล่าสุด: '+lastFetchStr+'</span>'+
-      '<span style="font-family:JetBrains Mono,monospace;color:#00E5FF;font-size:9px">'+totalRows.toLocaleString()+' แถว | ล่าสุด: '+latestDate+'</span>'+
-      '<button id="btnSPRefresh" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
-      '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
-      '</div>';
-  }
-
-  // ── Filter bar (ประเภทการซื้อ + ชนิดกุ้ง) ─────────────────────────
-  var filterBarHtml = '';
-  if(spData && spData.length){
-    // Build unique options from ALL data (not filtered) for dropdowns
-    var allRmTypes  = [...new Set(spData.map(function(r){return rmGet(r,RMCOL.rmType);}).filter(Boolean))].sort();
-    var allShrimps  = [...new Set(spData.map(function(r){return rmGet(r,RMCOL.shrimpType);}).filter(Boolean))].sort();
-    var rmOpts  = '<option value="">-- ทุกประเภทการซื้อ --</option>'+
-      allRmTypes.map(function(t){ return '<option value="'+t+'"'+(t===spFilterRmType?' selected':'')+'>'+t+'</option>'; }).join('');
-    var shOpts  = '<option value="">-- ทุกชนิดกุ้ง --</option>'+
-      allShrimps.map(function(t){ return '<option value="'+t+'"'+(t===spFilterShrimp?' selected':'')+'>'+t+'</option>'; }).join('');
-    var hasAnyFilter = spFilterDate||spFilterRmType||spFilterShrimp;
-    var spDateDisp = spFilterDate||(dateToShow||'');
-    filterBarHtml =
-      // Row 1: Date filter
-      '<div style="background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:8px">'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">'+
-        '<div><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">📅 วันที่รับ RM</div>'+
-          '<input type="date" id="spDateInp" value="'+spFilterDate+'" style="background:rgba(10,15,30,0.85);border:1px solid '+(spFilterDate?'rgba(0,229,255,0.5)':'rgba(0,229,255,0.2)')+';border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:JetBrains Mono,monospace"></div>'+
-        '<button id="spBtnToday" class="btn btn-c btn-sm" style="align-self:flex-end">วันนี้</button>'+
-        '<button id="spBtnYest" class="btn btn-g btn-sm" style="align-self:flex-end">เมื่อวาน</button>'+
-        '<button id="spBtnAll" class="btn btn-g btn-sm" style="align-self:flex-end">ทั้งหมด</button>'+
-        (spFilterDate?'<span style="font-size:9px;color:#00E5FF;align-self:flex-end;padding-bottom:4px;font-family:JetBrains Mono,monospace">กรอง: '+spFilterDate+'</span>':'<span style="font-size:9px;color:#6B7A8D;align-self:flex-end;padding-bottom:4px">ทุกวัน</span>')+
-      '</div>'+
-      // Row 2: RM Type + Shrimp Type
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
-        '<div style="flex:1;min-width:160px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ประเภทการซื้อ</div>'+
-          '<select id="spSelRmType" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+rmOpts+'</select></div>'+
-        '<div style="flex:1;min-width:140px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ชนิดกุ้ง</div>'+
-          '<select id="spSelShrimp" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+shOpts+'</select></div>'+
-        '<div style="font-family:JetBrains Mono,monospace;font-size:10px;align-self:flex-end;padding-bottom:4px">'+
-          '<span style="color:'+(rows&&rows.length>0?'#00D68F':'#6B7A8D')+'">'+
-          (rows?rows.length:0).toLocaleString()+'</span>'+
-          '<span style="color:#6B7A8D"> / '+(spData?spData.length:0).toLocaleString()+' แถว</span>'+
-        '</div>'+
-        (hasAnyFilter?'<button onclick="spFilterDate=\'\';spFilterRmType=\'\';spFilterShrimp=\'\';renderProcSection();" class="btn btn-e btn-sm" style="align-self:flex-end">✕ ล้างทั้งหมด</button>':'')+
-      '</div>'+
-      '</div>';
-  }
-  if(!rows) return '<div id="spSection">'+statusHtml+'</div>';
-
-  // ── Today's summary
-  // Exact column mapping — Procurement_Master_File RM-RECIVE
-  var totKg   = rows.reduce(function(a,r){ return a + rmNum(r,RMCOL.buyWt); },0);
-  var totCost = rows.reduce(function(a,r){ return a + rmNum(r,RMCOL.cost); },0);
-  var farms={}, sizes={}, rmTypes={};
-  rows.forEach(function(r){
-    var farm = rmGet(r,RMCOL.farmCode)||rmGet(r,RMCOL.supplier);
-    var sz   = rmGet(r,RMCOL.size);
-    var rmt  = rmGet(r,RMCOL.rmType);
-    var kg   = rmNum(r,RMCOL.buyWt);
-    if(farm) farms[farm]=(farms[farm]||0)+kg;
-    if(sz)   sizes[sz]=(sizes[sz]||0)+kg;
-    if(rmt)  rmTypes[rmt]=(rmTypes[rmt]||0)+kg;
-  });
-
-  // KPI summary
-  var avgPx = totKg>0?(totCost/totKg).toFixed(2):'—';
-  var kpiHtml = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
-    MC('รับ RM ('+dateToShow+')', rows.length, 'รายการ', '#00D68F', Object.keys(farms).length+' ฟาร์ม')+
-    MC('น้ำหนักซื้อรวม', fmt(totKg,1), 'kg', '#FFB800')+
-    MC('มูลค่าซื้อ', '฿'+fmt(Math.round(totCost/1000))+'K', 'THB', '#FF4757')+
-    MC('ราคาเฉลี่ย', avgPx, '฿/kg', '#7B61FF')+
-    '</div>';
-
-  // Size breakdown bar
-  // Farm breakdown
-  var farmKeys = Object.keys(farms).filter(function(k){return k&&k!=='?';}).sort(function(a,b){return farms[b]-farms[a];});
-  var szBarHtml = '';
-  // RM Type pills
-  var rmTypeKeys = Object.keys(rmTypes).filter(function(k){return k;});
-  if(rmTypeKeys.length){
-    szBarHtml += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
-      rmTypeKeys.map(function(t){
-        return '<span style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:18px;padding:3px 10px;font-size:10px;color:#00E5FF">'+
-          esc(t)+' <b style="font-family:JetBrains Mono,monospace">'+fmt(rmTypes[t],0)+' kg</b></span>';
-      }).join('')+'</div>';
-  }
-  // Farm weight bars (top 8)
-  if(farmKeys.length){
-    var maxFarmKg = farmKeys.reduce(function(a,k){return Math.max(a,farms[k]);},0);
-    szBarHtml += '<div style="margin-bottom:10px">'+
-      '<div style="font-size:9px;color:#6B7A8D;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">น้ำหนักแยกฟาร์ม (kg)</div>'+
-      farmKeys.slice(0,8).map(function(farm){
-        var pct2=maxFarmKg>0?Math.round(farms[farm]/maxFarmKg*100):0;
-        return '<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">'+
-          '<span style="font-weight:600;color:#E8ECF1">'+esc(farm)+'</span>'+
-          '<span style="font-family:JetBrains Mono,monospace;color:#FFB800;font-size:10px">'+fmt(farms[farm],1)+' kg</span></div>'+
-          '<div style="background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden">'+
-          '<div style="width:'+pct2+'%;background:#FFB800;height:100%;border-radius:3px;transition:width .5s"></div></div></div>';
-      }).join('')+'</div>';
-  }
-
-  // Rows table — dynamic columns from first row
-  var tableHtml = '';
-  if(rows.length){
-    var allKeys = Object.keys(rows[0]);
-    // Put date-like first, skip empty cols
-    var dateKeys = allKeys.filter(function(k){return k.indexOf('วัน')>=0||k.indexOf('date')>=0;});
-    var otherKeys = allKeys.filter(function(k){return dateKeys.indexOf(k)<0;});
-    // Priority columns first for RM-RECIVE sheet
-    // Display columns: exact order for RM-RECIVE
-    var wantedCols = [RMCOL.date,RMCOL.farmCode,RMCOL.supplier,RMCOL.rmType,RMCOL.shrimpType,
-                      RMCOL.size,RMCOL.buyWt,RMCOL.actualWt,RMCOL.price,RMCOL.cost,RMCOL.avgPrice];
-    var shownCols = [];
-    wantedCols.forEach(function(wc){
-      var k = Object.keys(rows[0]||{}).find(function(k){return k.toLowerCase()===wc.toLowerCase();});
-      if(k && rows.some(function(r){return r[k]&&r[k]!=='';}) && shownCols.indexOf(k)<0) shownCols.push(k);
-    });
-    // fallback to auto-detected cols if wanted not found
-    colOrder = shownCols.length>=3 ? shownCols : colOrder.slice(0,10);
-
-    var rowsHtml = rows.map(function(r,i){
-      return '<tr>'+colOrder.map(function(k){
-        var v = r[k]||'—';
-        // Highlight weight/price cols
-        var isNum = !isNaN(parseFloat(v));
-        var color = (k.indexOf('น้ำหนัก')>=0||k.indexOf('weight')>=0||k==='wt')?'#FFB800':
-                    (k.indexOf('ราคา')>=0||k.indexOf('price')>=0)?'#00D68F':'';
-        return '<td style="'+(color?'color:'+color+';':'')+(isNum?'font-family:JetBrains Mono,monospace;text-align:right;':'')+'">'+esc(v)+'</td>';
-      }).join('')+'</tr>';
-    }).join('');
-
-    tableHtml = '<div class="tw" style="max-height:320px;overflow-y:auto">'+
-      '<table style="font-size:11px"><thead><tr>'+
-      colOrder.map(function(k){return '<th style="font-size:9px">'+esc(k.toUpperCase())+'</th>';}).join('')+
-      '</tr></thead><tbody>'+rowsHtml+'</tbody></table></div>';
-  } else {
-    // Debug + วันที่มีข้อมูล
-    var availDates2 = spData?[...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(function(d){return d&&d!=='';}))]
-      .sort():[];
-    var totalSpRows = spData?spData.length:0;
-    var sampleCols = spData&&spData[0]?Object.keys(spData[0]).slice(0,4).join(' | '):'—';
-    var recentDates = availDates2.slice(-5).reverse();
-    // Debug box
-    var debugHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:11px">'+
-      '<div style="color:#FFB800;font-weight:700;font-size:10px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
-      '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;line-height:1.8">'+
-      'File: <b style="color:#E8ECF1">'+(dbg.fileName||'?')+'</b> &nbsp; Size: <b style="color:#E8ECF1">'+(dbg.fileSize?Math.round(dbg.fileSize/1024)+'KB':'?')+'</b><br>'+
-      'Sheets: <span style="color:#7B61FF">'+(dbg.allSheets?dbg.allSheets.join(' | '):'?')+'</span><br>'+
-      'Sheet used: <b style="color:#00E5FF">'+(dbg.sheetFound||'?')+'</b> &nbsp; Raw rows: <b style="color:#E8ECF1">'+(dbg.rawRows!=null?dbg.rawRows:'?')+'</b><br>'+
-      'Row 0 (actual): <span style="color:#FF4757">'+(dbg.firstRowSample||'?')+'</span><br>'+
-      'Header row idx: <b style="color:#FFB800">'+(dbg.headerRowIdx!=null?dbg.headerRowIdx:'?')+'</b> &nbsp; Header: <span style="color:#00D68F">'+(dbg.headerRowSample||'?')+'</span><br>'+
-      'Parsed (spData): <b style="color:'+(totalSpRows>0?'#00D68F':'#FF4757')+'">'+totalSpRows+'</b> &nbsp; Date range: <b style="color:#00E5FF">'+(availDates2[0]||'—')+' → '+(availDates2[availDates2.length-1]||'—')+'</b>'+
-      '</div></div>';
-    var hintHtml = recentDates.length?
-      '<div style="margin-top:8px;font-size:11px;color:#6B7A8D;text-align:left">วันที่มีข้อมูลล่าสุด: '+
-        recentDates.map(function(d){
-          return '<button onclick="filterDate=\'' + d + '\';renderProcSection();" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:2px 8px;color:#00E5FF;font-size:11px;cursor:pointer;margin:2px">' + d + '</button>';
-        }).join('')+'</div>':'';
-    tableHtml = debugHtml+
-      '<div style="color:#6B7A8D;text-align:center;padding:12px;font-size:12px">'+
-      (dateToShow?'ไม่มีรายการรับ RM วันที่ <b style="color:#E8ECF1">'+dateToShow+'</b>':
-       (totalSpRows===0?'ไม่มีข้อมูลใน SharePoint — ตรวจสอบชื่อ Sheet':'ไม่มีข้อมูล (กด วันที่มีข้อมูล ด้านล่าง)'))+
-      hintHtml+'</div>';
-  }
-
-  return '<div id="spSection">'+statusHtml+filterBarHtml+kpiHtml+szBarHtml+tableHtml+'</div>';
-}
-
-function bindSPButtons(){
-  var b;
-  // Bind SP date filter
-  var spDtInp = document.getElementById('spDateInp');
-  if(spDtInp) spDtInp.onchange = function(){ spFilterDate = this.value; renderProcSection(); };
-  var spBtnT = document.getElementById('spBtnToday');
-  if(spBtnT) spBtnT.onclick = function(){ spFilterDate = tod(); renderProcSection(); };
-  var spBtnY = document.getElementById('spBtnYest');
-  if(spBtnY) spBtnY.onclick = function(){ spFilterDate = yest(); renderProcSection(); };
-  var spBtnA = document.getElementById('spBtnAll');
-  if(spBtnA) spBtnA.onclick = function(){ spFilterDate = ''; renderProcSection(); };
-  // Bind SP filter dropdowns
-  var selRm = document.getElementById('spSelRmType');
-  if(selRm) selRm.onchange = function(){ spFilterRmType = this.value; renderProcSection(); };
-  var selSh = document.getElementById('spSelShrimp');
-  if(selSh) selSh.onchange = function(){ spFilterShrimp = this.value; renderProcSection(); };
-  b=document.getElementById('btnSPFetch');    if(b) b.onclick=fetchRMReceive;
-  b=document.getElementById('btnSPLogout');
-  if(b) b.onclick=function(){
-    var app=getMSAL();
-    if(app){
-      var accts=app.getAllAccounts();
-      if(accts.length){ app.logout({account:accts[0]}); }
-      else { spError=null; spData=null; render(); }
-    }
-  };
-  b=document.getElementById('btnSPRefresh');  if(b) b.onclick=fetchRMReceive;
-  b=document.getElementById('btnSPRetry');    if(b) b.onclick=function(){spError=null;fetchRMReceive();};
-  b=document.getElementById('btnSPRedirect'); if(b) b.onclick=getSPTokenViaRedirect;
-  b=document.getElementById('btnCopyUri');
-  if(b) b.onclick=function(){
-    var uri=window.location.href.split('?')[0];
-    navigator.clipboard.writeText(uri).then(function(){
-      b.textContent='✓ Copied!';b.style.color='#00D68F';
-      setTimeout(function(){b.innerHTML='📋 Copy URI';b.style.color='';},2000);
-    });
-  };
-}
 
 // ── PROCUREMENT ─────────────────────────────────────────────────────
 function renderProcurement(){
-  var totRmPlan = data.orders.reduce(function(a,o){return a+(o.kgRm||0);},0);
-  var totPo = data.pos.filter(function(p){return p.status!=='cancelled';}).reduce(function(a,p){return a+(p.qty||0);},0);
-  var totRec = data.pos.filter(function(p){return p.status==='received';}).reduce(function(a,p){return a+(p.qty||0);},0);
-  var totCost = data.pos.reduce(function(a,p){return a+(p.qty||0)*(p.price||0);},0);
-  var cov = totRmPlan>0?(totPo/totRmPlan)*100:0;
-
-  var covBar = NB(totPo,totRmPlan,cov>=100?'#00D68F':'#FFB800');
-  var szBars = SIZES.map(function(sz){
-    var ordKg = data.orders.filter(function(o){return o.size===sz;}).reduce(function(a,o){return a+(o.kgRm||0);},0);
-    if(!ordKg) return '';
-    var poKg = data.pos.filter(function(p){return p.size===sz&&p.status!=='cancelled';}).reduce(function(a,p){return a+(p.qty||0);},0);
-    var cv2 = ordKg>0?(poKg/ordKg)*100:0;
-    return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="font-weight:600">'+sz+'</span><span style="font-family:JetBrains Mono,monospace;color:'+(cv2>=100?'#00D68F':'#FFB800')+';font-size:10px">'+fmt(poKg)+'/'+fmt(ordKg)+' kg ('+pct(cv2)+')</span></div>'+NB(poKg,ordKg,cv2>=100?'#00D68F':cv2>=70?'#FFB800':'#FF4757')+'</div>';
-  }).join('');
-  var covCard = GC('RM COVERAGE','📊','rgba(255,184,0,0.3)',
-    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="font-weight:700">Overall</span><span style="font-family:JetBrains Mono,monospace;color:'+(cov>=100?'#00D68F':'#FFB800')+'">'+pct(cov)+'</span></div>'+covBar+szBars);
-
-  var szOptsPo = SIZES.map(function(s){return {v:s,l:s+' ('+spv(s).rm+' ตัว/กก.)'};});
-  var poForm = GC('ADD PURCHASE ORDER','🛒','rgba(255,184,0,0.3)',
-    FR(FG('Farm / Supplier','pofFarm','text',pof.farm,'placeholder="เช่น 6CQK, เต็มซีฟู้ด" style="width:145px"'),
-       SL('RM Size','pofSz',szOptsPo,pof.sz))+
-    FR(FG('Qty (kg RM)','pofQty','number',pof.qty,'style="width:100px"'),
-       FG('ราคา ฿/kg','pofPr','number',pof.pr,'style="width:85px"'),
-       FG('PO Date','pofDt','date',pof.dt))+
-    FR(SL('Status','pofSt',[{v:'pending',l:'pending'},{v:'confirmed',l:'confirmed'},{v:'received',l:'received'},{v:'cancelled',l:'cancelled'}],pof.status),
-       BTN('btnAddPo','+ Add PO','btn-w')));
-
-  var poRows = data.pos.map(function(p){
-    var sc = {confirmed:'#00E5FF',received:'#00D68F',pending:'#FFB800',cancelled:'#FF4757'}[p.status]||'#6B7A8D';
+  var d2=fd();
+  var totRmPlan=data.orders.reduce(function(a,o){return a+(o.kgRm||0);},0);
+  var totPo=data.pos.filter(function(p){return p.status!=='cancelled';}).reduce(function(a,p){return a+(p.qty||0);},0);
+  var totRec=data.pos.filter(function(p){return p.status==='received';}).reduce(function(a,p){return a+(p.qty||0);},0);
+  var totCost=data.pos.reduce(function(a,p){return a+(p.qty||0)*(p.price||0);},0);
+  var cov=totRmPlan>0?(totPo/totRmPlan)*100:0;
+  var szOpts=SIZES.map(function(s){return {v:s,l:s+' ('+SPEC[s].rm+' ตัว/กก.)'};});
+  var poRows=data.pos.map(function(p){
+    var sc={confirmed:'#00E5FF',received:'#00D68F',pending:'#FFB800',cancelled:'#FF4757'}[p.status]||'#6B7A8D';
     return '<tr><td><b>'+esc(p.farm||'')+'</b></td><td>'+esc(p.size||'')+'</td>'+
       '<td class="r">'+fmt(p.qty)+'</td><td class="r">'+((p.price||0).toFixed(2))+'</td>'+
       '<td class="r" style="color:#FFB800">'+fmt(p.cost)+'</td><td>'+esc(p.poDate||'')+'</td>'+
@@ -1147,283 +862,154 @@ function renderProcurement(){
       (p.status!=='cancelled'?'<button class="btn btn-e btn-sm po-cancel" data-id="'+p.id+'">✕</button>':'')+
       '</td></tr>';
   }).join('');
-  var poTbl = GC('PURCHASE ORDERS','📋','rgba(255,184,0,0.3)',
-    '<div class="tw"><table><thead><tr><th>FARM</th><th>SIZE</th><th class="r">QTY kg</th><th class="r">฿/kg</th><th class="r">COST ฿</th><th>DATE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>'+
-    (poRows||'<tr><td colspan="8" style="text-align:center;padding:16px;color:#6B7A8D">— no POs yet —</td></tr>')+
-    '</tbody></table></div>',
-    BD(data.pos.length+' POs','#FFB800','rgba(255,184,0,0.12)'));
-
-  // ── SharePoint RM Receive Card ─────────────────────────────
-  var spCard = GC('RM RECEIVE — SharePoint Daily Feed (sheet: rm recive)','📥','rgba(0,229,255,0.3)',
-    renderSPWidget(),'<span style="font-size:9px;color:#6B7A8D;font-family:JetBrains Mono,monospace">ksthatyai365.sharepoint.com</span>');
-
+  var szBars=SIZES.map(function(sz){
+    var ordKg=data.orders.filter(function(o){return o.size===sz;}).reduce(function(a,o){return a+(o.kgRm||0);},0);
+    if(!ordKg)return '';
+    var poKg=data.pos.filter(function(p){return p.size===sz&&p.status!=='cancelled';}).reduce(function(a,p){return a+(p.qty||0);},0);
+    var cv2=ordKg>0?(poKg/ordKg)*100:0;
+    return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="font-weight:600">'+sz+'</span><span style="font-family:JetBrains Mono,monospace;color:'+(cv2>=100?'#00D68F':'#FFB800')+';font-size:10px">'+fmt(poKg)+'/'+fmt(ordKg)+' kg ('+pct(cv2)+')</span></div>'+NB(poKg,ordKg,cv2>=100?'#00D68F':cv2>=70?'#FFB800':'#FF4757')+'</div>';
+  }).join('');
+  var covCard=GC('RM COVERAGE','📊','rgba(255,184,0,0.3)',
+    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="font-weight:700">Overall</span><span style="font-family:JetBrains Mono,monospace;color:'+(cov>=100?'#00D68F':'#FFB800')+'">'+pct(cov)+'</span></div>'+NB(totPo,totRmPlan,cov>=100?'#00D68F':'#FFB800')+szBars);
+  var poForm=GC('ADD PURCHASE ORDER','🛒','rgba(255,184,0,0.3)',
+    FR(FG('Farm / Supplier','pofFarm','text',pof.farm,'placeholder="เช่น 6CQK" style="width:145px"'),
+       SL('RM Size','pofSz',szOpts,pof.sz))+
+    FR(FG('Qty (kg RM)','pofQty','number',pof.qty,'style="width:100px"'),
+       FG('ราคา ฿/kg','pofPr','number',pof.pr,'style="width:85px"'),
+       FG('PO Date','pofDt','date',pof.dt))+
+    FR(SL('Status','pofSt',[{v:'pending',l:'pending'},{v:'confirmed',l:'confirmed'},{v:'received',l:'received'},{v:'cancelled',l:'cancelled'}],pof.status),
+       BTN('btnAddPo','+ Add PO','btn-w')));
+  var spSection=renderSPWidget();
   return MR(MC('RM PLAN',fmt(totRmPlan),'kg from orders','#7B61FF'),
             MC('PO COMMITTED',fmt(totPo),'kg','#FFB800','Coverage '+pct(cov)),
             MC('RECEIVED',fmt(totRec),'kg','#00D68F'),
             MC('RM COST','฿'+fmt(Math.round(totCost/1000))+'K','THB','#FF4757'))+
-    spCard+covCard+'<div class="g2">'+poForm+poTbl+'</div>';
+    '<div class="gc" style="border-color:rgba(0,229,255,0.3);overflow:hidden">'+
+    '<div class="gh"><span>📥 RM RECEIVE — SharePoint Daily Feed</span><span style="font-size:9px;color:#6B7A8D">ksthatyai365.sharepoint.com</span></div>'+
+    '<div class="gb">'+spSection+'</div></div>'+
+    covCard+'<div class="g2">'+poForm+
+    GC('PURCHASE ORDERS','📋','rgba(255,184,0,0.3)',
+      '<div class="tw"><table><thead><tr><th>FARM</th><th>SIZE</th><th class="r">QTY kg</th><th class="r">฿/kg</th><th class="r">COST ฿</th><th>DATE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>'+
+      (poRows||'<tr><td colspan="8" style="text-align:center;padding:16px;color:#6B7A8D">— no POs yet —</td></tr>')+
+      '</tbody></table></div>',BD(data.pos.length+' POs','#FFB800','rgba(255,184,0,0.12)'))+'</div>';
 }
 
 // ── PRODUCTION ─────────────────────────────────────────────────────
 function renderProduction(){
   var d2=fd();
-  var rmType = prd.rmType||'fresh';
-  var sp = SPEC[prd.sz]||SPEC['31/40'];
-  var yld = getYield(prd.sz, rmType);
-  var totFgPlan = data.orders.reduce(function(a,o){return a+(o.kgFg||0);},0);
-  var totFgAct  = d2.actuals.reduce(function(a,x){return a+(x.fgKg||0);},0);
-  var totRmUsed = d2.actuals.reduce(function(a,x){return a+(x.rmKg||0);},0);
-  var avgY = totRmUsed>0?(totFgAct/totRmUsed)*100:0;
-  var todTgt = (data.targets.find(function(t){return t.date===tod();})||{}).fgKg||0;
-  var todAct = d2.actuals.filter(function(a){return a.date===tod();}).reduce(function(a,x){return a+(x.fgKg||0);},0);
-
-  // P&L preview for current batch
-  var autoRm = prd.fg?(prd.fg/yld).toFixed(0):'';
-  var actY = (prd.fg&&prd.rm)?(prd.fg/prd.rm*100).toFixed(1):null;
-  var yc = actY?(parseFloat(actY)>=yld*100-2?'#00D68F':'#FFB800'):null;
-  var bags = prd.fg?calcBags(+prd.fg):0;
-  var ctns = calcCartons(bags);
-  var totRmCostPerFg = 0;
-  if(data.pos.filter(function(p){return p.status==='received';}).length>0){
-    var recPo = data.pos.filter(function(p){return p.status==='received';});
-    var wtPrice = recPo.reduce(function(a,p){return a+(p.qty||0)*(p.price||0);},0);
-    var wtQty   = recPo.reduce(function(a,p){return a+(p.qty||0);},0);
-    var avgRmPx = wtQty>0?wtPrice/wtQty:0;
-    totRmCostPerFg = avgRmPx/yld;
-  }
-  // Sale price from orders (weighted avg)
-  var ordFg    = data.orders.filter(function(o){return o.size===prd.sz;}).reduce(function(a,o){return a+(o.kgFg||0);},0);
-  var ordRevPx = ordFg>0 ? data.orders.filter(function(o){return o.size===prd.sz;}).reduce(function(a,o){return a+(o.revThb||0);},0)/ordFg : sp.usSK*FX;
-  var gpPerFg  = totRmCostPerFg>0 ? (ordRevPx - totRmCostPerFg - sp.p) : 0;
-  var beRmPx   = (ordRevPx - sp.p) * yld;
-
-  // Progress bar
-  var progBar = todTgt>0?GC('TODAY PROGRESS','📈','rgba(0,229,255,0.2)',
-    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="font-weight:700">'+tod()+'</span><span style="font-family:JetBrains Mono,monospace;color:#00E5FF">'+fmt(todAct)+' / '+fmt(todTgt)+' kg FG</span></div>'+NB(todAct,todTgt,todAct>=todTgt?'#00D68F':'#00E5FF')):'';
-
-  // RM Type options
-  var rmTypeOpts=[
-    {v:'fresh', l:'กุ้งสด H/O (Fresh)'},
-    {v:'thawed',l:'กุ้งละลาย H/O (Thawed)'},
-    {v:'ho',    l:'H/ON นำเข้า (Imported)'},
-    {v:'hl',    l:'H/L นำเข้า (Imported HL)'},
-  ];
-  var szOpts = SIZES.map(function(s){return {v:s,l:s};});
+  var rmType=prd.rmType||'fresh';
+  var sp=SPEC[prd.sz]||SPEC['31/40'];
+  var yld=getYield(prd.sz,rmType);
+  var totFgPlan=data.orders.reduce(function(a,o){return a+(o.kgFg||0);},0);
+  var totFgAct=d2.actuals.reduce(function(a,x){return a+(x.fgKg||0);},0);
+  var totRmUsed=d2.actuals.reduce(function(a,x){return a+(x.rmKg||0);},0);
+  var avgY=totRmUsed>0?(totFgAct/totRmUsed)*100:0;
+  var todTgt=(data.targets.find(function(t){return t.date===tod();})||{}).fgKg||0;
+  var todAct=d2.actuals.filter(function(a){return a.date===tod();}).reduce(function(a,x){return a+(x.fgKg||0);},0);
+  var autoRm=prd.fg?(prd.fg/yld).toFixed(0):'';
+  var actY=(prd.fg&&prd.rm)?(prd.fg/prd.rm*100).toFixed(1):null;
+  var yc=actY?(parseFloat(actY)>=yld*100-2?'#00D68F':'#FFB800'):null;
+  var bags=prd.fg?calcBags(+prd.fg):0;
+  var ctns=calcCartons(bags);
+  var rmTypeOpts=[{v:'fresh',l:'กุ้งสด H/O'},{v:'thawed',l:'กุ้งละลาย H/O'},{v:'ho',l:'H/ON นำเข้า'},{v:'hl',l:'H/L นำเข้า'}];
+  var szOpts=SIZES.map(function(s){return {v:s,l:s};});
   var shiftOpts=[{v:'A',l:'Shift A'},{v:'B',l:'Shift B'},{v:'C',l:'Shift C'}];
-
-  // Yield info box
-  var yieldInfo = actY?IB(
-    'Yield จริง: <b style="font-family:JetBrains Mono,monospace;color:'+yc+'">'+actY+'%</b> '+
-    '<span style="color:#6B7A8D">(Spec '+rmType+': '+(yld*100).toFixed(2)+'%)</span> &nbsp;'+
-    'Proc Cost: <b style="font-family:JetBrains Mono,monospace">฿'+sp.p.toFixed(2)+'/kg FG</b>',yc):'';
-
-  // Bags & Carton preview
-  var packPreview = prd.fg?IB(
-    '<span style="font-family:JetBrains Mono,monospace">'+
-    '<b style="color:#FFB800">'+bags.toLocaleString()+'</b> Bags (900g) &nbsp;|&nbsp; '+
-    '<b style="color:#00E5FF">'+ctns.toLocaleString()+'</b> Cartons (10.8kg) &nbsp;|&nbsp; '+
-    (totRmCostPerFg>0?'GP: <b style="color:'+(gpPerFg>=0?'#00D68F':'#FF4757')+'">฿'+gpPerFg.toFixed(1)+'/kg FG</b>':'<span style="color:#6B7A8D">GP: ยังไม่มี PO รับแล้ว</span>')+
-    '</span>','#7B61FF'):'';
-
-  var actForm = GC('RECORD DAILY ACTUAL','🏭','rgba(0,229,255,0.25)',
-    FR(FG('Date','prdDt','date',prd.dt),
-       SL('Size FG','prdSz',szOpts,prd.sz),
-       SL('Shift','prdShift',shiftOpts,prd.shift))+
-    FR(SL('ประเภท RM','prdRmType',rmTypeOpts,rmType),
-       FG('FG ได้ (kg)','prdFg','number',prd.fg,'style="width:100px"'),
-       FG('RM ใช้ (kg)','prdRm','number',prd.rm,'style="width:100px" placeholder="auto: '+autoRm+'"'),
-       FG('MHR','prdMhr','number',prd.mhr,'style="width:72px" placeholder="man-hrs"'))+
-    yieldInfo+packPreview+
-    BTN('btnAddAct','+ บันทึกผลผลิต','btn-c')+
-    '<div style="font-size:9px;color:#6B7A8D;margin-top:5px">* ระบบสร้าง QC Batch อัตโนมัติ | Bags = FG÷0.9 | Carton = Bags÷12</div>');
-
-  // P&L status card
-  var plCard = (totRmCostPerFg>0||beRmPx>0)?IB(
-    '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px">'+
-    '<div><div style="color:#6B7A8D;font-size:9px;text-transform:uppercase;margin-bottom:2px">Sale Price ('+prd.sz+')</div><div style="font-family:JetBrains Mono,monospace;font-weight:700;color:#FFB800">฿'+fmt(Math.round(ordRevPx))+'/kg FG</div></div>'+
-    '<div><div style="color:#6B7A8D;font-size:9px;text-transform:uppercase;margin-bottom:2px">RM Cost/kg FG</div><div style="font-family:JetBrains Mono,monospace;font-weight:700;color:#FF4757">'+(totRmCostPerFg>0?'฿'+totRmCostPerFg.toFixed(1):'—')+'/kg FG</div></div>'+
-    '<div><div style="color:#6B7A8D;font-size:9px;text-transform:uppercase;margin-bottom:2px">Proc Cost</div><div style="font-family:JetBrains Mono,monospace;font-weight:700;color:#6B7A8D">฿'+sp.p.toFixed(2)+'/kg FG</div></div>'+
-    '<div><div style="color:#6B7A8D;font-size:9px;text-transform:uppercase;margin-bottom:2px">GP/kg FG</div><div style="font-family:JetBrains Mono,monospace;font-weight:700;color:'+(gpPerFg>=0?'#00D68F':'#FF4757')+'">'+(totRmCostPerFg>0?'฿'+gpPerFg.toFixed(2):'—')+'</div></div>'+
-    '<div><div style="color:#6B7A8D;font-size:9px;text-transform:uppercase;margin-bottom:2px">BE RM Price</div><div style="font-family:JetBrains Mono,monospace;font-weight:700;color:#7B61FF">฿'+beRmPx.toFixed(1)+'/kg RM</div></div>'+
-    '</div>','#7B61FF'):'';
-
-  // Spec reference table with all yield types
-  var specRows = SIZES.map(function(s){
-    var sp2=SPEC[s]; var isSel=s===prd.sz;
-    var yldV = getYield(s,rmType);
-    return '<tr style="background:'+(isSel?'rgba(0,229,255,0.06)':'transparent')+'">'+
-      '<td><b style="color:'+(isSel?'#00E5FF':'#E8ECF1')+'">'+s+'</b></td>'+
-      '<td style="color:#6B7A8D;font-size:10px">'+sp2.rm+'</td>'+
-      '<td style="color:'+(isSel?'#00E5FF':'#E8ECF1')+'"><b>'+(yldV*100).toFixed(2)+'%</b></td>'+
-      '<td>'+sp2.p.toFixed(2)+'</td>'+
-      '<td style="color:#FFB800">'+sp2.usSK.toFixed(2)+'</td>'+
-      '<td style="color:#6B7A8D">'+sp2.usSF.toFixed(2)+'</td>'+
-      '<td style="font-size:10px;color:#6B7A8D">'+sp2.bagsMin+'–'+sp2.bagsMax+'</td>'+
-      '</tr>';
-  }).join('');
-  var specCard = GC('SPEC REFERENCE FM-RD-01 Rev.15 | Yield: <span style="color:#FFB800">'+({fresh:'กุ้งสด',thawed:'กุ้งละลาย',ho:'Imported H/O',hl:'Imported H/L'}[rmType]||'fresh')+'</span>','📊','rgba(0,229,255,0.25)',
-    '<div class="tw"><table><thead><tr>'+
-    '<th>SIZE</th><th>RM SIZE</th><th>YIELD% ('+rmType+')</th><th>PROC ฿</th><th>US SK $/kg</th><th>US SF $/kg</th><th>BAGS/CTN</th>'+
-    '</tr></thead><tbody>'+specRows+'</tbody></table></div>'+
-    '<div style="font-size:9px;color:#6B7A8D;margin-top:6px;font-family:JetBrains Mono,monospace">1 Carton = 12 bags × 900g = 10.8 kg &nbsp;|&nbsp; Bags range = จำนวนตัว/ถุง</div>');
-
-  // Actuals table
-  var actRows = d2.actuals.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(a){
+  var yieldInfo=actY?IB('Yield จริง: <b style="font-family:JetBrains Mono,monospace;color:'+yc+'">'+actY+'%</b> (Spec '+rmType+': '+(yld*100).toFixed(2)+'%) &nbsp; Proc: <b>฿'+sp.p.toFixed(2)+'/kg FG</b>',yc):'';
+  var packPrev=prd.fg?IB('<span style="font-family:JetBrains Mono,monospace"><b style="color:#FFB800">'+bags.toLocaleString()+'</b> Bags &nbsp;|&nbsp; <b style="color:#00E5FF">'+ctns.toLocaleString()+'</b> Cartons</span>','#7B61FF'):'';
+  var actRows=d2.actuals.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(a){
     var q=data.qc.find(function(q){return q.prodId===a.id;});
-    var qs=q?q.status:'—'; var qc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[qs]||'#6B7A8D';
+    var qs=q?q.status:'—';var qc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[qs]||'#6B7A8D';
     var yc2=a.yield>=62?'#00D68F':a.yield>=58?'#FFB800':'#FF4757';
-    var b2=calcBags(a.fgKg||0); var c2=calcCartons(b2);
-    var rmT = a.rmType||'fresh';
     return '<tr><td>'+esc(a.date||'')+'</td><td><b style="color:#00E5FF">'+esc(a.size||'')+'</b></td><td>'+esc(a.shift||'')+'</td>'+
-      '<td><span style="font-size:9px;color:#FFB800">'+({fresh:'สด',thawed:'ละลาย',ho:'H/ON',hl:'H/L'}[rmT]||rmT)+'</span></td>'+
+      '<td><span style="font-size:9px;color:#FFB800">'+({fresh:'สด',thawed:'ละลาย',ho:'H/ON',hl:'H/L'}[a.rmType||'fresh']||'สด')+'</span></td>'+
       '<td class="r">'+fmt(a.fgKg)+'</td><td class="r" style="color:#FFB800">'+fmt(a.rmKg)+'</td>'+
       '<td class="r" style="color:'+yc2+'">'+pct(a.yield)+'</td>'+
-      '<td class="r">'+b2.toLocaleString()+'</td><td class="r">'+c2.toLocaleString()+'</td>'+
-      '<td class="r">'+((a.mhr)||'—')+'</td>'+
-      '<td class="r" style="font-size:10px">'+fmt(a.ohCost)+'</td>'+
+      '<td class="r">'+calcBags(a.fgKg||0).toLocaleString()+'</td><td class="r">'+calcCartons(calcBags(a.fgKg||0)).toLocaleString()+'</td>'+
       '<td><span class="badge" style="color:'+qc+';background:'+qc+'18;border-color:'+qc+'30">'+esc(qs)+'</span></td></tr>';
   }).join('');
-
-  var actTbl = GC('PRODUCTION ACTUALS','📋','rgba(0,229,255,0.25)',
-    '<div class="tw"><table><thead><tr>'+
-    '<th>DATE</th><th>SIZE</th><th>SHIFT</th><th>RM TYPE</th>'+
-    '<th class="r">FG kg</th><th class="r">RM kg</th><th class="r">YIELD</th>'+
-    '<th class="r">BAGS</th><th class="r">CTN</th><th class="r">MHR</th><th class="r">OH ฿</th><th>QC</th>'+
-    '</tr></thead><tbody>'+
-    (actRows||'<tr><td colspan="12" style="text-align:center;padding:16px;color:#6B7A8D">— no data yet —</td></tr>')+
-    '</tbody></table></div>',
-    BD(d2.actuals.length+' batches','#00E5FF','rgba(0,229,255,0.12)'));
-
-  return MR(
-    MC('TODAY FG',fmt(todAct),'Target: '+fmt(todTgt)+' kg','#00E5FF',todTgt?pct(todAct/todTgt*100)+' of target':'no target'),
-    MC('FG CUMULATIVE',fmt(totFgAct),'kg','#7B61FF',totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),
-    MC('RM USED',fmt(totRmUsed),'kg','#FFB800'),
-    MC('AVG YIELD',pct(avgY),'overall',avgY>=64?'#00D68F':avgY>=60?'#FFB800':'#FF4757'))+
-    plCard+progBar+
-    '<div class="g2">'+actForm+specCard+'</div>'+actTbl;
+  var specRows=SIZES.map(function(s){
+    var sp2=SPEC[s];var isSel=s===prd.sz;
+    return '<tr style="background:'+(isSel?'rgba(0,229,255,0.06)':'transparent')+'"><td><b style="color:'+(isSel?'#00E5FF':'#E8ECF1')+'">'+s+'</b></td><td style="color:#6B7A8D">'+sp2.rm+'</td><td class="r">'+(getYield(s,rmType)*100).toFixed(2)+'%</td><td class="r">'+sp2.p.toFixed(2)+'</td><td class="r" style="color:#FFB800">'+sp2.usSK.toFixed(2)+'</td></tr>';
+  }).join('');
+  var todProg=todTgt>0?GC('TODAY PROGRESS','📈','rgba(0,229,255,0.2)',
+    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="font-weight:700">'+tod()+'</span><span style="font-family:JetBrains Mono,monospace;color:#00E5FF">'+fmt(todAct)+' / '+fmt(todTgt)+' kg FG</span></div>'+NB(todAct,todTgt,todAct>=todTgt?'#00D68F':'#00E5FF')):'';
+  return MR(MC('TODAY FG',fmt(todAct),'Target: '+fmt(todTgt)+' kg','#00E5FF',todTgt?pct(todAct/todTgt*100)+' of target':'no target'),
+            MC('FG CUMULATIVE',fmt(totFgAct),'kg','#7B61FF',totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),
+            MC('RM USED',fmt(totRmUsed),'kg','#FFB800'),
+            MC('AVG YIELD',pct(avgY),'overall',avgY>=64?'#00D68F':avgY>=60?'#FFB800':'#FF4757'))+
+    todProg+
+    '<div class="g2">'+
+    GC('RECORD DAILY ACTUAL','🏭','rgba(0,229,255,0.25)',
+      FR(FG('Date','prdDt','date',prd.dt),SL('Size FG','prdSz',szOpts,prd.sz),SL('Shift','prdShift',shiftOpts,prd.shift))+
+      FR(SL('ประเภท RM','prdRmType',rmTypeOpts,rmType),FG('FG ได้ (kg)','prdFg','number',prd.fg,'style="width:100px"'),FG('RM ใช้ (kg)','prdRm','number',prd.rm,'style="width:100px" placeholder="auto: '+autoRm+'"'),FG('MHR','prdMhr','number',prd.mhr,'style="width:72px"'))+
+      yieldInfo+packPrev+BTN('btnAddAct','+ บันทึกผลผลิต','btn-c')+
+      '<div style="font-size:9px;color:#6B7A8D;margin-top:5px">* สร้าง QC Batch อัตโนมัติ</div>')+
+    GC('SPEC FM-RD-01 Rev.15','📊','rgba(0,229,255,0.25)',
+      '<div class="tw"><table><thead><tr><th>SIZE</th><th>RM SIZE</th><th class="r">YIELD ('+rmType+')</th><th class="r">PROC ฿</th><th class="r">US SK $/kg</th></tr></thead><tbody>'+specRows+'</tbody></table></div>')+'</div>'+
+    GC('PRODUCTION ACTUALS','📋','rgba(0,229,255,0.25)',
+      '<div class="tw"><table><thead><tr><th>DATE</th><th>SIZE</th><th>SHIFT</th><th>RM TYPE</th><th class="r">FG kg</th><th class="r">RM kg</th><th class="r">YIELD</th><th class="r">BAGS</th><th class="r">CTN</th><th>QC</th></tr></thead><tbody>'+
+      (actRows||'<tr><td colspan="10" style="text-align:center;padding:16px;color:#6B7A8D">— no data yet —</td></tr>')+
+      '</tbody></table></div>',BD(d2.actuals.length+' batches','#00E5FF','rgba(0,229,255,0.12)'));
 }
 
 // ── QC ──────────────────────────────────────────────────────────────
 function renderQC(){
   var d2=fd();
-  var pending  = d2.qc.filter(function(q){return q.status==='pending';});
-  var approved = d2.qc.filter(function(q){return q.status==='approved';});
-  var onHold   = d2.qc.filter(function(q){return q.status==='hold';});
-  var avgA     = approved.length>0?approved.reduce(function(a,q){return a+(q.gradeA||0);},0)/approved.length:0;
-  var sel      = data.qc.find(function(q){return q.id===selBatch;});
-  var tot      = +gr.a+ +gr.b+ +gr.c+ +gr.d+ +gr.bk;
-  var valid    = Math.abs(tot-100)<1;
-
-  // Count per bag spec check
-  var selSpec = sel?SPEC[sel.size]||null:null;
-  var countOk = selSpec&&gr.countBag>0?(gr.countBag>=selSpec.bagsMin&&gr.countBag<=selSpec.bagsMax):null;
-  var countColor = countOk===null?'#6B7A8D':countOk?'#00D68F':'#FF4757';
-  var countMsg = selSpec&&gr.countBag>0?(
-    countOk?'✓ ในสเปก ('+selSpec.bagsMin+'–'+selSpec.bagsMax+' ตัว/ถุง)':
-    '⚠ นอกสเปก! สเปก: '+selSpec.bagsMin+'–'+selSpec.bagsMax+' | นับได้: '+gr.countBag
-  ):(selSpec?'สเปก: '+(selSpec.bagsMin)+'–'+(selSpec.bagsMax)+' ตัว/ถุง':'');
-
-  // Revenue preview by grade (A→SK, B/C→SF, D/BK→by-product)
-  var revPreview='';
-  if(sel&&tot>0){
-    var sp2 = SPEC[sel.size]||SPEC['31/40'];
-    var fgA=sel.fgKg*gr.a/100, fgB=sel.fgKg*gr.b/100, fgC=sel.fgKg*gr.c/100;
-    var revA=fgA*(sp2.usSK*FX), revB=fgB*(sp2.usSF*FX), revC=fgC*(sp2.usSF*0.85*FX);
-    var totRev=revA+revB+revC;
-    var bagsA=calcBags(fgA), bagsBC=calcBags(fgB+fgC);
-    revPreview='<div style="background:rgba(0,214,143,0.06);border:1px solid rgba(0,214,143,0.2);border-radius:9px;padding:9px 12px;font-size:11px;margin-bottom:8px">'+
-      '<div style="font-size:9px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Revenue Preview ('+sel.size+')</div>'+
-      '<div style="display:flex;gap:14px;flex-wrap:wrap;font-family:JetBrains Mono,monospace">'+
-      '<div><div style="color:#6B7A8D;font-size:8px">Grade A (SK) '+gr.a+'%</div><div style="color:#00D68F;font-weight:700">฿'+fmt(Math.round(revA))+'</div><div style="font-size:9px;color:#6B7A8D">'+fmt(fgA,1)+' kg / '+bagsA+' bags</div></div>'+
-      '<div><div style="color:#6B7A8D;font-size:8px">Grade B+C (SF) '+(+gr.b+ +gr.c)+'%</div><div style="color:#FFB800;font-weight:700">฿'+fmt(Math.round(revB+revC))+'</div><div style="font-size:9px;color:#6B7A8D">'+fmt(fgB+fgC,1)+' kg / '+bagsBC+' bags</div></div>'+
-      '<div><div style="color:#6B7A8D;font-size:8px">Revenue QC</div><div style="color:#7B61FF;font-weight:700;font-size:14px">฿'+fmt(Math.round(totRev))+'</div></div>'+
-      '</div></div>';
-  }
-
-  // Batch list
+  var pending=d2.qc.filter(function(q){return q.status==='pending';});
+  var approved=d2.qc.filter(function(q){return q.status==='approved';});
+  var onHold=d2.qc.filter(function(q){return q.status==='hold';});
+  var avgA=approved.length>0?approved.reduce(function(a,q){return a+(q.gradeA||0);},0)/approved.length:0;
+  var sel=data.qc.find(function(q){return q.id===selBatch;});
+  var tot=+gr.a+ +gr.b+ +gr.c+ +gr.d+ +gr.bk;
+  var valid=Math.abs(tot-100)<1;
+  var selSpec=sel?SPEC[sel.size]||null:null;
+  var countOk=selSpec&&gr.countBag>0?(gr.countBag>=selSpec.bagsMin&&gr.countBag<=selSpec.bagsMax):null;
+  var countColor=countOk===null?'#6B7A8D':countOk?'#00D68F':'#FF4757';
   var batchItems=d2.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
     var isSel=selBatch===q.id;
     var sc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[q.status]||'#6B7A8D';
     var sp3=SPEC[q.size];
-    var extra=q.status!=='pending'?
-      '<div style="font-size:10px;color:#6B7A8D;margin-top:3px">%A:'+q.gradeA+' %B:'+q.gradeB+' %C:'+q.gradeC+' %D:'+q.gradeD+' %BK:'+q.gradeBK+
-      ' | Defect:'+q.defectPct+'%'+(q.countPerBag?' | Count:'+q.countPerBag+'/bag':'')+
-      (q.rmType?' | '+({fresh:'สด',thawed:'ละลาย',ho:'H/ON',hl:'H/L'}[q.rmType]||q.rmType):'')+'</div>':'';
-    var hint=q.status==='pending'?'<div style="font-size:9px;color:'+(isSel?'#00D68F':'#6B7A8D')+';margin-top:2px">'+(isSel?'✓ เลือกแล้ว':'คลิกเพื่อตรวจ QC')+'</div>':'';
     var bags2=sp3?'(spec: '+sp3.bagsMin+'–'+sp3.bagsMax+' ตัว/ถุง)':'';
     return '<div class="bi'+(isSel?' sel':'')+'" '+(q.status==='pending'?'data-batchid="'+q.id+'"':'')+'>'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
-      '<div><b style="font-size:12px">'+esc(q.date||'')+'</b>'+
-      '<span style="margin-left:8px;color:#00E5FF;font-size:11px">'+esc(q.size||'')+'</span>'+
-      '<span style="margin-left:8px;font-family:JetBrains Mono,monospace;font-size:11px">'+fmt(q.fgKg)+' kg</span>'+
-      '<span style="margin-left:8px;font-size:9px;color:#6B7A8D">'+bags2+'</span></div>'+
+      '<div><b style="font-size:12px">'+esc(q.date||'')+'</b><span style="margin-left:8px;color:#00E5FF;font-size:11px">'+esc(q.size||'')+'</span><span style="margin-left:8px;font-family:JetBrains Mono,monospace;font-size:11px">'+fmt(q.fgKg)+' kg</span><span style="margin-left:8px;font-size:9px;color:#6B7A8D">'+bags2+'</span></div>'+
       '<span class="badge" style="color:'+sc+';background:'+sc+'18;border-color:'+sc+'30">'+esc(q.status||'')+'</span></div>'+
-      extra+hint+'</div>';
+      (q.status!=='pending'?'<div style="font-size:10px;color:#6B7A8D;margin-top:3px">%A:'+q.gradeA+' %B:'+q.gradeB+' %C:'+q.gradeC+' %D:'+q.gradeD+' %BK:'+q.gradeBK+' Defect:'+q.defectPct+'%</div>':'')+
+      (q.status==='pending'?'<div style="font-size:9px;color:'+(isSel?'#00D68F':'#6B7A8D')+';margin-top:2px">'+(isSel?'✓ เลือกแล้ว':'คลิกเพื่อตรวจ QC')+'</div>':'')+
+      '</div>';
   }).join('');
-
-  // Grade entry form
   var gradeForm=sel?
-    IB('<b>'+esc(sel.size||'')+'</b> · '+fmt(sel.fgKg)+' kg FG'+
-      (sel.rmType?' · '+({fresh:'กุ้งสด',thawed:'กุ้งละลาย',ho:'H/ON นำเข้า',hl:'H/L นำเข้า'}[sel.rmType]||sel.rmType):''),'#00D68F')+
+    IB('<b>'+esc(sel.size||'')+'</b> · '+fmt(sel.fgKg)+' kg FG','#00D68F')+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">'+
-    [['a','Grade A %','#00D68F'],['b','Grade B %','#00E5FF'],['c','Grade C %','#FFB800'],
-     ['d','Grade D %','#FF4757'],['bk','BK %','#6B7A8D'],['def','Defect %','#FF4757']].map(function(x){
-      return '<div class="fg"><label style="color:'+x[2]+'">'+x[1]+'</label>'+
-        '<input type="number" id="gr'+x[0]+'" value="'+(gr[x[0]]||0)+'" style="border-color:'+x[2]+'40" min="0" max="100"></div>';
+    [['a','Grade A %','#00D68F'],['b','Grade B %','#00E5FF'],['c','Grade C %','#FFB800'],['d','Grade D %','#FF4757'],['bk','BK %','#6B7A8D'],['def','Defect %','#FF4757']].map(function(x){
+      return '<div class="fg"><label style="color:'+x[2]+'">'+x[1]+'</label><input type="number" id="gr'+x[0]+'" value="'+(gr[x[0]]||0)+'" style="border-color:'+x[2]+'40" min="0" max="100"></div>';
     }).join('')+'</div>'+
-    IB('รวม Grade: <b style="font-family:JetBrains Mono,monospace;color:'+(valid?'#00D68F':'#FF4757')+'">'+tot.toFixed(1)+'%</b>'+(valid?' <span style="color:#00D68F">✓</span>':'<span style="color:#FF4757"> (ต้องรวมได้ 100%)</span>'),valid?'#00D68F':'#FF4757')+
-    // Count per bag section
-    '<div style="display:flex;gap:9px;margin-bottom:9px;flex-wrap:wrap">'+
-      '<div class="fg" style="flex:1"><label>จำนวนตัว/ถุง (Count/Bag)</label>'+
-        '<input type="number" id="grCountBag" value="'+(gr.countBag||0)+'" placeholder="นับตัวอย่าง" style="border-color:'+countColor+'40"></div>'+
-      (selSpec&&gr.countBag>0?'<div style="align-self:flex-end;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;color:'+countColor+';background:'+countColor+'12;border:1px solid '+countColor+'40">'+countMsg+'</div>':
-       selSpec?'<div style="align-self:flex-end;font-size:10px;color:#6B7A8D;padding-bottom:6px">Spec: '+(selSpec.bagsMin)+'–'+(selSpec.bagsMax)+' ตัว</div>':'')+
+    IB('รวม Grade: <b style="font-family:JetBrains Mono,monospace;color:'+(valid?'#00D68F':'#FF4757')+'">'+tot.toFixed(1)+'%</b>'+(valid?' ✓':'<span style="color:#FF4757"> (ต้องรวมได้ 100%)</span>'),valid?'#00D68F':'#FF4757')+
+    '<div style="display:flex;gap:8px;margin-bottom:8px">'+
+      '<div class="fg" style="flex:1"><label>จำนวนตัว/ถุง (Count/Bag)</label><input type="number" id="grCountBag" value="'+(gr.countBag||0)+'" style="border-color:'+countColor+'40"></div>'+
+      (selSpec&&gr.countBag>0?'<div style="align-self:flex-end;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;color:'+countColor+';background:'+countColor+'12;border:1px solid '+countColor+'40">'+(countOk?'✓ ในสเปก '+selSpec.bagsMin+'–'+selSpec.bagsMax:'⚠ นอกสเปก! '+selSpec.bagsMin+'–'+selSpec.bagsMax)+'</div>':'')+
     '</div>'+
-    '<div class="fg" style="margin-bottom:9px"><label>หมายเหตุ QC</label>'+
-      '<input type="text" id="grNotes" value="'+esc(gr.notes||'')+'" placeholder="สังเกตการณ์ เช่น สีไม่สม่ำเสมอ / แก้มดำ / กลิ่น"></div>'+
-    revPreview+
-    '<div style="display:flex;gap:8px">'+
-      BTN('btnQCApprove','✓ อนุมัติ (Approved)','btn-ok')+
-      BTN('btnQCHold','⚠ Hold','btn-e')+
-    '</div>'
+    '<div class="fg" style="margin-bottom:9px"><label>หมายเหตุ QC</label><input type="text" id="grNotes" value="'+esc(gr.notes||'')+'" placeholder="สังเกตการณ์..."></div>'+
+    '<div style="display:flex;gap:8px">'+BTN('btnQCApprove','✓ อนุมัติ','btn-ok')+BTN('btnQCHold','⚠ Hold','btn-e')+'</div>'
     :'<div style="text-align:center;padding:32px;color:#6B7A8D">👆 คลิก Batch ที่ต้องการตรวจ QC</div>';
-
-  // QC Summary table
   var qcRows=d2.qc.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).map(function(q){
     var sc={approved:'#00D68F',hold:'#FF4757',pending:'#FFB800'}[q.status]||'#6B7A8D';
-    var sp3=SPEC[q.size];
-    var cntOk=sp3&&q.countPerBag?(q.countPerBag>=sp3.bagsMin&&q.countPerBag<=sp3.bagsMax):null;
-    return '<tr><td>'+esc(q.date||'')+'</td><td><b style="color:#00E5FF">'+esc(q.size||'')+'</b></td>'+
-      '<td class="r">'+fmt(q.fgKg)+'</td>'+
+    return '<tr><td>'+esc(q.date||'')+'</td><td><b style="color:#00E5FF">'+esc(q.size||'')+'</b></td><td class="r">'+fmt(q.fgKg)+'</td>'+
       '<td class="r" style="color:'+((q.gradeA||0)>=63?'#00D68F':'#FFB800')+'">'+((q.gradeA)||'—')+'</td>'+
-      '<td class="r">'+((q.gradeB)||'—')+'</td>'+
-      '<td class="r" style="color:'+((q.gradeC||0)>20?'#FF4757':'#E8ECF1')+'">'+((q.gradeC)||'—')+'</td>'+
-      '<td class="r">'+((q.gradeD)||'—')+'</td>'+
-      '<td class="r">'+((q.gradeBK)||'—')+'</td>'+
+      '<td class="r">'+((q.gradeB)||'—')+'</td><td class="r">'+((q.gradeC)||'—')+'</td>'+
+      '<td class="r">'+((q.gradeD)||'—')+'</td><td class="r">'+((q.gradeBK)||'—')+'</td>'+
       '<td class="r" style="color:'+((q.defectPct||0)>3?'#FF4757':'#E8ECF1')+'">'+((q.defectPct)||'—')+'</td>'+
-      '<td class="r">'+(q.countPerBag?'<span style="color:'+((cntOk===null?'#6B7A8D':cntOk?'#00D68F':'#FF4757'))+'">'+q.countPerBag+'</span>':'—')+'</td>'+
-      '<td style="font-size:10px;color:#6B7A8D">'+(q.qcNotes||'—')+'</td>'+
+      '<td>'+(q.countPerBag||'—')+'</td>'+
       '<td><span class="badge" style="color:'+sc+';background:'+sc+'18;border-color:'+sc+'30">'+esc(q.status||'')+'</span></td></tr>';
   }).join('');
-
-  return MR(
-    MC('PENDING QC',pending.length,'batches','#FFB800'),
-    MC('APPROVED',approved.length,'batches','#00D68F'),
-    MC('ON HOLD',onHold.length,'batches','#FF4757'),
-    MC('AVG %A',pct(avgA),'grade A',avgA>=63?'#00D68F':avgA>=55?'#FFB800':'#FF4757'))+
+  return MR(MC('PENDING QC',pending.length,'batches','#FFB800'),MC('APPROVED',approved.length,'batches','#00D68F'),MC('ON HOLD',onHold.length,'batches','#FF4757'),MC('AVG %A',pct(avgA),'grade A',avgA>=63?'#00D68F':avgA>=55?'#FFB800':'#FF4757'))+
     '<div class="g2">'+
     GC('QC BATCH QUEUE','🔬','rgba(0,214,143,0.35)',batchItems||'<div style="color:#6B7A8D;text-align:center;padding:20px">ยังไม่มี Batch</div>')+
-    GC(sel?'GRADE ENTRY — '+esc(sel.date||'')+' '+esc(sel.size||''):'เลือก Batch จากซ้าย','📊','rgba(0,214,143,0.35)',gradeForm)+
-    '</div>'+
+    GC(sel?'GRADE ENTRY — '+esc(sel.date||'')+' '+esc(sel.size||''):'เลือก Batch จากซ้าย','📊','rgba(0,214,143,0.35)',gradeForm)+'</div>'+
     GC('QC SUMMARY','📈','rgba(0,214,143,0.35)',
-      '<div class="tw"><table><thead><tr>'+
-      '<th>DATE</th><th>SIZE</th><th class="r">FG kg</th><th class="r">%A</th><th class="r">%B</th>'+
-      '<th class="r">%C</th><th class="r">%D</th><th class="r">%BK</th><th class="r">DEFECT</th>'+
-      '<th class="r">COUNT/BAG</th><th>NOTES</th><th>STATUS</th>'+
-      '</tr></thead><tbody>'+
-      (qcRows||'<tr><td colspan="12" style="text-align:center;padding:16px;color:#6B7A8D">— no QC data —</td></tr>')+
-      '</tbody></table></div>',
-      BD(d2.qc.length+' batches','#00D68F','rgba(0,214,143,0.12)'));
+      '<div class="tw"><table><thead><tr><th>DATE</th><th>SIZE</th><th class="r">FG kg</th><th class="r">%A</th><th class="r">%B</th><th class="r">%C</th><th class="r">%D</th><th class="r">%BK</th><th class="r">DEFECT</th><th class="r">COUNT/BAG</th><th>STATUS</th></tr></thead><tbody>'+
+      (qcRows||'<tr><td colspan="11" style="text-align:center;padding:16px;color:#6B7A8D">— no QC data —</td></tr>')+
+      '</tbody></table></div>',BD(d2.qc.length+' batches','#00D68F','rgba(0,214,143,0.12)'));
 }
 
 // ── SALES ──────────────────────────────────────────────────────────
@@ -1434,44 +1020,31 @@ function renderSales(){
   var ships=d2.shipments.filter(function(s){return s.containerNo&&!s.isInventory;});
   var totShip=ships.reduce(function(a,s){return a+(s.kgFg||0);},0);
   var totRev=ships.reduce(function(a,s){return a+(s.revThb||0);},0);
-
+  var szOpts=SIZES.map(function(s){return {v:s,l:s};});
+  var pr2=parseFloat(shf.pr)||SPEC[shf.sz].usSK;
+  var revPrev=shf.kg?IB('Revenue: <b style="font-family:JetBrains Mono,monospace;color:#00D68F">฿'+fmt(Math.round(shf.kg*pr2*FX))+'</b>','#00D68F'):'';
   var invCards=inv.map(function(q){
     return '<div style="background:rgba(0,214,143,0.1);border:1px solid rgba(0,214,143,0.3);border-radius:10px;padding:11px 14px;min-width:130px">'+
       '<div style="font-weight:700;font-size:13px">'+esc(q.size||'')+'</div>'+
       '<div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700;color:#00D68F">'+fmt(q.fgKg)+' <span style="font-size:11px;font-weight:400">kg</span></div>'+
       '<div style="font-size:9px;color:#6B7A8D;margin-top:2px">'+esc(q.date||'')+' · %A: '+(q.gradeA||0)+'%</div></div>';
   }).join('');
-
-  var pr2 = parseFloat(shf.pr)||spv(shf.sz).u;
-  var revPrev=shf.kg?IB('Revenue: <b style="font-family:JetBrains Mono,monospace;color:#00D68F">฿'+fmt(Math.round(shf.kg*pr2*FX*2.20462))+'</b>','#00D68F'):'';
-  var szOpts=SIZES.map(function(s){return {v:s,l:s};});
-  var shipForm=GC('RECORD SHIPMENT','📦','rgba(255,159,67,0.3)',
-    FR(FG('Customer','shfCust','text',shf.cust,'placeholder="เช่น Korea WO-18" style="width:145px"'),
-       FG('Container No.','shfCon','text',shf.con,'placeholder="ABCU1234567" style="width:130px"'))+
-    FR(SL('Size FG','shfSz',szOpts,shf.sz),
-       FG('FG (kg)','shfKg','number',shf.kg,'style="width:95px"'),
-       FG('Price USD/lb','shfPr','number',shf.pr,'style="width:85px" placeholder="'+spv(shf.sz).u+'"'),
-       FG('Ship Date','shfDt','date',shf.dt))+
-    revPrev+BTN('btnAddShip','📦 บันทึกการจัดส่ง','btn-w'));
-
   var shipRows=ships.map(function(s){
     return '<tr><td><b>'+esc(s.customer||'')+'</b></td><td>'+esc(s.containerNo||'—')+'</td>'+
       '<td>'+esc(s.size||'')+'</td><td class="r">'+fmt(s.kgFg)+'</td>'+
       '<td class="r" style="color:#FF9F43">฿'+fmt(Math.round((s.revThb||0)/1000))+'K</td>'+
       '<td>'+esc(s.shipDate||'')+'</td></tr>';
   }).join('');
-
-  return MR(MC('FG AVAILABLE',fmt(totApp),'kg QC Approved','#00D68F'),
-            MC('SHIPPED',fmt(totShip),'kg','#FF9F43'),
-            MC('REMAINING',fmt(Math.max(0,totApp-totShip)),'kg',totApp>totShip?'#FFB800':'#6B7A8D'),
-            MC('REVENUE','฿'+fmt(Math.round(totRev/1000))+'K','realized','#00D68F',ships.length+' containers'))+
-    GC('FG INVENTORY — QC APPROVED','✅','rgba(0,214,143,0.35)',
-      inv.length?'<div style="display:flex;flex-wrap:wrap;gap:9px">'+invCards+'</div>':'<div style="color:#6B7A8D">รอ QC อนุมัติก่อน</div>')+
-    '<div class="g2">'+shipForm+
+  return MR(MC('FG AVAILABLE',fmt(totApp),'kg QC Approved','#00D68F'),MC('SHIPPED',fmt(totShip),'kg','#FF9F43'),MC('REMAINING',fmt(Math.max(0,totApp-totShip)),'kg',totApp>totShip?'#FFB800':'#6B7A8D'),MC('REVENUE','฿'+fmt(Math.round(totRev/1000))+'K','realized','#00D68F',ships.length+' containers'))+
+    GC('FG INVENTORY — QC APPROVED','✅','rgba(0,214,143,0.35)',inv.length?'<div style="display:flex;flex-wrap:wrap;gap:9px">'+invCards+'</div>':'<div style="color:#6B7A8D">รอ QC อนุมัติก่อน</div>')+
+    '<div class="g2">'+
+    GC('RECORD SHIPMENT','📦','rgba(255,159,67,0.3)',
+      FR(FG('Customer','shfCust','text',shf.cust,'placeholder="เช่น Korea WO-18" style="width:145px"'),FG('Container No.','shfCon','text',shf.con,'placeholder="ABCU1234567" style="width:130px"'))+
+      FR(SL('Size FG','shfSz',szOpts,shf.sz),FG('FG (kg)','shfKg','number',shf.kg,'style="width:95px"'),FG('Price USD/kg','shfPr','number',shf.pr,'style="width:85px"'),FG('Ship Date','shfDt','date',shf.dt))+
+      revPrev+BTN('btnAddShip','📦 บันทึกการจัดส่ง','btn-w'))+
     GC('SHIPMENT LOG','🚢','rgba(255,159,67,0.3)',
       '<div class="tw"><table><thead><tr><th>CUSTOMER</th><th>CONTAINER</th><th>SIZE</th><th class="r">KG</th><th class="r">REV ฿</th><th>DATE</th></tr></thead><tbody>'+
       (shipRows||'<tr><td colspan="6" style="text-align:center;padding:16px;color:#6B7A8D">ยังไม่มีการจัดส่ง</td></tr>')+
-      (totShip?'<tr style="background:rgba(0,229,255,0.03)"><td colspan="3" style="font-weight:700">รวม</td><td class="r" style="font-weight:700;color:#FF9F43">'+fmt(totShip)+'</td><td class="r" style="font-weight:700;color:#00D68F">฿'+fmt(Math.round(totRev/1000))+'K</td><td></td></tr>':'')+
       '</tbody></table></div>')+'</div>';
 }
 
@@ -1492,42 +1065,21 @@ function renderManagement(){
   var avgA=approved.length>0?approved.reduce(function(a,q){return a+(q.gradeA||0);},0)/approved.length:0;
   var gp=totRevR-totRmCost-totOH;
   var gpPct=totRevR>0?(gp/totRevR)*100:0;
-
-  var plItems=[
-    {l:'Revenue',v:totRevR,c:'#00D68F'},
-    {l:'RM Cost',v:-totRmCost,c:'#FF4757'},
-    {l:'OH Cost',v:-totOH,c:'#FFB800'},
-    {l:'Gross Profit',v:gp,c:gp>=0?'#00D68F':'#FF4757',bold:true}
-  ].map(function(item){
+  var plItems=[{l:'Revenue',v:totRevR,c:'#00D68F'},{l:'RM Cost',v:-totRmCost,c:'#FF4757'},{l:'OH Cost',v:-totOH,c:'#FFB800'},{l:'Gross Profit',v:gp,c:gp>=0?'#00D68F':'#FF4757',bold:true}].map(function(item){
     return '<div style="flex:1;min-width:95px;background:'+(item.bold?'rgba(0,229,255,0.12)':item.c+'12')+';border:1px solid '+item.c+'25;border-radius:10px;padding:11px 13px;text-align:center">'+
       '<div style="font-size:8px;color:#6B7A8D;text-transform:uppercase;letter-spacing:.5px;font-family:Space Grotesk,sans-serif;margin-bottom:3px">'+item.l+'</div>'+
       '<div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700;color:'+item.c+'">'+(item.v>=0?'+':'')+fmt(Math.round(item.v/1000))+'K ฿</div>'+
       (item.bold?'<div style="font-size:9px;color:#00E5FF;font-weight:700;margin-top:2px">'+pct(gpPct)+'</div>':'')+
       '</div>';
   }).join('');
-  var plCard=GC('P&L WATERFALL','💰','rgba(0,229,255,0.28)','<div style="display:flex;gap:9px;flex-wrap:wrap">'+plItems+'</div>');
-
-  var pipeItems=[
-    {l:'📋 Orders',v:totFgPlan,max:totFgPlan,c:'#7B61FF'},
-    {l:'🛒 RM Committed',v:totPo,max:totRmPlan,c:'#FFB800'},
-    {l:'🏭 FG Produced',v:totFgAct,max:totFgPlan,c:'#00E5FF'},
-    {l:'🔬 QC Approved',v:totApp,max:totFgAct,c:'#00D68F'},
-    {l:'📦 Shipped',v:totShip,max:totApp,c:'#FF9F43'}
-  ].map(function(item){
-    var pv=item.max>0?Math.min(item.v/item.max*100,100):0;
-    return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="font-weight:600">'+item.l+'</span><span style="font-family:JetBrains Mono,monospace;color:'+item.c+';font-size:10px">'+fmt(item.v)+' kg · '+pct(pv)+'</span></div>'+NB(item.v,item.max,item.c)+'</div>';
-  }).join('');
-
   var notifs=(data.notifications||[]).slice().sort(function(a,b){return b.time-a.time;}).slice(0,10);
   var notifItems=notifs.map(function(n){
     var r2=ROLES.find(function(x){return x.id===n.dept;})||ROLES[0];
     return '<div style="display:flex;gap:7px;padding:7px 0;border-bottom:1px solid rgba(0,229,255,0.08)">'+
       '<span style="font-size:14px">'+r2.e+'</span>'+
       '<div style="flex:1"><div style="font-size:11px;color:#E8ECF1">'+esc(n.msg||'')+'</div>'+
-      '<div style="font-size:8.5px;color:#6B7A8D;margin-top:1px;font-family:Space Grotesk,sans-serif">'+r2.l+' · '+ts(n.time)+'</div></div>'+
-      BD(r2.s,r2.c,r2.b)+'</div>';
+      '<div style="font-size:8.5px;color:#6B7A8D;margin-top:1px;font-family:Space Grotesk,sans-serif">'+r2.l+' · '+ts(n.time)+'</div></div></div>';
   }).join('');
-
   var deptItems=[
     {r:ROLES[0],c:data.orders.length,l:data.orders.length+' orders · FG '+fmt(totFgPlan)+' kg'},
     {r:ROLES[1],c:data.pos.length,l:data.pos.length+' POs · '+pct(totRmPlan>0?totPo/totRmPlan*100:0)+' covered'},
@@ -1537,28 +1089,244 @@ function renderManagement(){
   ].map(function(x){
     var r=x.r,c=x.c,l=x.l;
     return '<div style="background:'+(c>0?r.b:'transparent')+';border:1px solid '+(c>0?r.c+'30':'rgba(0,229,255,0.1)')+';border-radius:10px;padding:11px 13px">'+
-      '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'+
-      '<span style="font-size:17px">'+r.e+'</span>'+
+      '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><span style="font-size:17px">'+r.e+'</span>'+
       '<div><div style="font-weight:700;font-size:11px;color:'+(c>0?r.c:'#6B7A8D')+';font-family:Space Grotesk,sans-serif">'+r.l+'</div>'+
       '<div style="font-size:8.5px;color:#6B7A8D">'+r.s+'</div></div>'+
       '<div style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:'+(c>0?r.c:'rgba(0,229,255,0.1)')+(c>0?';box-shadow:0 0 5px '+r.c:'')+'">&nbsp;</div></div>'+
       '<div style="font-size:11px;color:'+(c>0?'#E8ECF1':'#6B7A8D')+'">'+(c>0?l:'— no data —')+'</div></div>';
   }).join('');
-
-  return MR(MC('FG PLAN','฿'+fmt(Math.round(totRevPlan/1000))+'K',fmt(totFgPlan)+' kg','#7B61FF'),
-            MC('FG PRODUCED',fmt(totFgAct),'kg','#00E5FF',totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),
-            MC('QC APPROVED',fmt(totApp),'kg','#00D68F','%A avg: '+pct(avgA)),
-            MC('REVENUE','฿'+fmt(Math.round(totRevR/1000))+'K',fmt(totShip)+' kg shipped','#FFB800'),
-            MC('GROSS PROFIT','฿'+fmt(Math.round(gp/1000))+'K',pct(gpPct)+' GP%',gp>=0?'#00D68F':'#FF4757'))+
-    plCard+
+  return MR(MC('FG PLAN','฿'+fmt(Math.round(totRevPlan/1000))+'K',fmt(totFgPlan)+' kg','#7B61FF'),MC('FG PRODUCED',fmt(totFgAct),'kg','#00E5FF',totFgPlan?pct(totFgAct/totFgPlan*100)+' of plan':''),MC('QC APPROVED',fmt(totApp),'kg','#00D68F','%A avg: '+pct(avgA)),MC('REVENUE','฿'+fmt(Math.round(totRevR/1000))+'K',fmt(totShip)+' kg shipped','#FFB800'),MC('GROSS PROFIT','฿'+fmt(Math.round(gp/1000))+'K',pct(gpPct)+' GP%',gp>=0?'#00D68F':'#FF4757'))+
+    GC('P&L WATERFALL','💰','rgba(0,229,255,0.28)','<div style="display:flex;gap:9px;flex-wrap:wrap">'+plItems+'</div>')+
     '<div class="g2">'+
-    GC('PRODUCTION PIPELINE','⚡','rgba(0,229,255,0.22)',pipeItems)+
-    GC('ACTIVITY FEED','🔔','rgba(0,229,255,0.22)',
-      notifs.length?'<div style="max-height:280px;overflow-y:auto">'+notifItems+'</div>':'<div style="color:#6B7A8D;text-align:center;padding:20px">— no activity —</div>',
-      BD(notifs.length+' events','#00E5FF','rgba(0,229,255,0.12)'))+
+    GC('PRODUCTION PIPELINE','⚡','rgba(0,229,255,0.22)',
+      [{l:'📋 Orders',v:totFgPlan,max:totFgPlan,c:'#7B61FF'},{l:'🛒 RM Committed',v:totPo,max:totRmPlan,c:'#FFB800'},{l:'🏭 FG Produced',v:totFgAct,max:totFgPlan,c:'#00E5FF'},{l:'🔬 QC Approved',v:totApp,max:totFgAct,c:'#00D68F'},{l:'📦 Shipped',v:totShip,max:totApp,c:'#FF9F43'}].map(function(item){
+        var pv=item.max>0?Math.min(item.v/item.max*100,100):0;
+        return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="font-weight:600">'+item.l+'</span><span style="font-family:JetBrains Mono,monospace;color:'+item.c+';font-size:10px">'+fmt(item.v)+' kg · '+pct(pv)+'</span></div>'+NB(item.v,item.max,item.c)+'</div>';
+      }).join(''))+
+    GC('ACTIVITY FEED','🔔','rgba(0,229,255,0.22)',notifs.length?'<div style="max-height:280px;overflow-y:auto">'+notifItems+'</div>':'<div style="color:#6B7A8D;text-align:center;padding:20px">— no activity —</div>',BD(notifs.length+' events','#00E5FF','rgba(0,229,255,0.12)'))+'</div>'+
+    GC('DEPARTMENT STATUS','🏢','rgba(0,229,255,0.22)','<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px">'+deptItems+'</div>');
+}
+
+// ── SHAREPOINT RM RECEIVE WIDGET ─────────────────────────────────
+function renderSPWidget(){
+  var dbg = typeof spDebug !== 'undefined' ? spDebug : {};
+
+  // ── Filter bar (แสดงเสมอ ไม่ว่าข้อมูลจะโหลดหรือยัง) ───────────────
+  var allRmTypes = spData ? [...new Set(spData.map(function(r){return rmGet(r,RMCOL.rmType);}).filter(Boolean))].sort() : [];
+  var allShrimps = spData ? [...new Set(spData.map(function(r){return rmGet(r,RMCOL.shrimpType);}).filter(Boolean))].sort() : [];
+  var rmOpts = '<option value="">ทุกประเภทการซื้อ</option>'+
+    allRmTypes.map(function(t){return '<option value="'+esc(t)+'"'+(t===spFilterRmType?' selected':'')+'>'+esc(t)+'</option>';}).join('');
+  var shOpts = '<option value="">ทุกชนิดกุ้ง</option>'+
+    allShrimps.map(function(t){return '<option value="'+esc(t)+'"'+(t===spFilterShrimp?' selected':'')+'>'+esc(t)+'</option>';}).join('');
+  var hasFilter = spFilterDate||spFilterRmType||spFilterShrimp;
+
+  var filterUI = '<div style="background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.12);border-radius:10px;padding:10px 13px;margin-bottom:10px">'+
+    // Row 1: Date
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">'+
+      '<div><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">📅 วันที่รับ RM</div>'+
+        '<input type="date" id="spDateInp" value="'+spFilterDate+'" style="background:rgba(10,15,30,0.85);border:1px solid '+(spFilterDate?'rgba(0,229,255,0.5)':'rgba(0,229,255,0.2)')+';border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:JetBrains Mono,monospace">'+
+      '</div>'+
+      '<button id="spBtnToday" class="btn btn-c btn-sm">วันนี้</button>'+
+      '<button id="spBtnYest" class="btn btn-g btn-sm">เมื่อวาน</button>'+
+      '<button id="spBtnAll" class="btn btn-g btn-sm">ทั้งหมด</button>'+
+      (spFilterDate?'<span style="font-size:9px;color:#00E5FF;align-self:flex-end;padding-bottom:4px;font-family:JetBrains Mono,monospace">🔵 '+spFilterDate+'</span>':'<span style="font-size:9px;color:#6B7A8D;align-self:flex-end;padding-bottom:4px">ทุกวัน</span>')+
     '</div>'+
-    GC('DEPARTMENT STATUS','🏢','rgba(0,229,255,0.22)',
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px">'+deptItems+'</div>');
+    // Row 2: RM Type + Shrimp
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
+      '<div style="flex:1;min-width:160px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ประเภทการซื้อ</div>'+
+        '<select id="spSelRmType" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+rmOpts+'</select></div>'+
+      '<div style="flex:1;min-width:140px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ชนิดกุ้ง</div>'+
+        '<select id="spSelShrimp" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+shOpts+'</select></div>'+
+      (hasFilter?'<button onclick="spFilterDate=\'\';spFilterRmType=\'\';spFilterShrimp=\'\';renderProcSection();" class="btn btn-e btn-sm" style="align-self:flex-end">✕ ล้างทั้งหมด</button>':'')+
+    '</div>'+
+  '</div>';
+
+  // ── Status ─────────────────────────────────────────────────────────
+  var statusHtml = '';
+  if(spLoading){
+    statusHtml = '<div style="display:flex;align-items:center;gap:8px;padding:10px;color:#FFB800;font-size:12px"><span class="cspin">⟳</span> กำลังดึงข้อมูลจาก SharePoint...</div>';
+  } else if(spError){
+    var errContent = '';
+    if(spError==='redirect_uri_mismatch'){
+      errContent='<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ Redirect URI ไม่ตรง</div><button id="btnCopyUri" class="btn btn-c btn-sm">📋 Copy URI</button>';
+    } else if(spError==='popup_blocked'){
+      errContent='<div style="color:#FFB800;font-size:12px;font-weight:700;margin-bottom:6px">⚠ Browser บล็อก Popup</div><div style="display:flex;gap:8px"><button id="btnSPRedirect" class="btn btn-w btn-sm">🔐 Login Redirect</button><button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองอีกครั้ง</button></div>';
+    } else {
+      errContent='<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ เกิดข้อผิดพลาด</div><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;word-break:break-all;margin-bottom:8px">'+esc(spError)+'</div><button id="btnSPRetry" class="btn btn-e btn-sm">↺ ลองใหม่</button>';
+    }
+    statusHtml = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:9px;padding:12px 14px;margin-bottom:8px">'+errContent+'</div>';
+  } else if(!spData){
+    statusHtml = '<div style="padding:12px;text-align:center"><button id="btnSPFetch" class="btn btn-c" style="gap:8px">🔄 ดึงข้อมูล RM Receive จาก SharePoint</button><div style="color:#6B7A8D;font-size:10px;margin-top:6px">ksthatyai365 | sheet: rm recive | Procurement_Master_File.xlsx</div></div>';
+    return '<div id="spSection">'+filterUI+statusHtml+'</div>';
+  } else {
+    var lastFetchStr = spLastFetch?spLastFetch.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+    var totalRows = spData.length;
+    var allDates2 = [...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(Boolean))].sort();
+    var latestDate = allDates2.length?allDates2[allDates2.length-1]:'—';
+    statusHtml = '<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:5px 0 8px;flex-wrap:wrap">'+
+      '<span style="color:#00D68F">●</span>'+
+      '<span style="color:#6B7A8D">ดึงล่าสุด: '+lastFetchStr+'</span>'+
+      '<span style="font-family:JetBrains Mono,monospace;color:#00E5FF;font-size:9px">'+totalRows.toLocaleString()+' แถว | ล่าสุด: '+latestDate+'</span>'+
+      '<button id="btnSPRefresh" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
+      '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
+      '</div>';
+  }
+
+  // ── Apply filters ──────────────────────────────────────────────────
+  var spDate = spFilterDate || '';
+  var baseRows = spDate ? spForDate(spDate) : spData.slice();
+  var rows = baseRows.filter(function(r){
+    if(spFilterRmType && rmGet(r,RMCOL.rmType).toLowerCase().indexOf(spFilterRmType.toLowerCase())<0) return false;
+    if(spFilterShrimp && rmGet(r,RMCOL.shrimpType).toLowerCase().indexOf(spFilterShrimp.toLowerCase())<0) return false;
+    return true;
+  });
+
+  // ── Row count badge ────────────────────────────────────────────────
+  var countBadge = '<div style="text-align:right;font-family:JetBrains Mono,monospace;font-size:10px;margin-bottom:8px">'+
+    '<span style="color:'+(rows.length>0?'#00D68F':'#FF4757')+'">'+rows.length.toLocaleString()+'</span>'+
+    '<span style="color:#6B7A8D"> / '+spData.length.toLocaleString()+' แถว</span>'+
+    (hasFilter?' <span style="color:#FFB800;font-size:9px">● ใช้ filter</span>':'')+
+  '</div>';
+
+  // ── KPI ───────────────────────────────────────────────────────────
+  // Flexible column getter — try RMCOL then scan all numeric columns
+  function getKg(r){
+    var v=rmNum(r,RMCOL.buyWt);
+    if(v) return v;
+    // fallback: find largest numeric value column
+    var maxV=0;
+    Object.keys(r).forEach(function(k){
+      if(k.indexOf('น้ำหนัก')>=0||k.indexOf('weight')>=0||k.indexOf('_kg_')>=0||k.indexOf('wt')>=0){
+        var n=parseFloat(r[k]);if(!isNaN(n)&&n>maxV)maxV=n;
+      }
+    });
+    return maxV;
+  }
+  function getCost(r){ return rmNum(r,RMCOL.cost)||rmNum(r,'[มูลค่าซื้อ]'); }
+  var totKg   = rows.reduce(function(a,r){return a+getKg(r);},0);
+  var totCost = rows.reduce(function(a,r){return a+getCost(r);},0);
+  var farms={}, rmTypes={};
+  rows.forEach(function(r){
+    var farm = rmGet(r,RMCOL.farmCode)||rmGet(r,RMCOL.supplier)||'Unknown';
+    var rmt  = rmGet(r,RMCOL.rmType)||'—';
+    var kg   = getKg(r);
+    if(farm) farms[farm]=(farms[farm]||0)+kg;
+    if(rmt)  rmTypes[rmt]=(rmTypes[rmt]||0)+kg;
+  });
+  var avgPx = totKg>0?(totCost/totKg).toFixed(2):'—';
+  var kpiHtml = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
+    MC('รายการ',rows.length.toLocaleString(),'รายการ','#00D68F',Object.keys(farms).length+' ฟาร์ม')+
+    MC('น้ำหนักซื้อ',fmt(totKg,1),'kg','#FFB800')+
+    MC('มูลค่าซื้อ','฿'+fmt(Math.round(totCost/1000))+'K','THB','#FF4757')+
+    MC('ราคาเฉลี่ย',avgPx,'฿/kg','#7B61FF')+
+    '</div>';
+
+  // ── RM Type pills ─────────────────────────────────────────────────
+  var rmTypeHtml = '';
+  var rmTypeKeys = Object.keys(rmTypes).filter(Boolean);
+  if(rmTypeKeys.length){
+    rmTypeHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
+      rmTypeKeys.map(function(t){
+        return '<span style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:18px;padding:3px 10px;font-size:10px;color:#00E5FF">'+
+          esc(t)+' <b style="font-family:JetBrains Mono,monospace">'+fmt(rmTypes[t],0)+' kg</b></span>';
+      }).join('')+'</div>';
+  }
+
+  // ── Farm bars ─────────────────────────────────────────────────────
+  var farmKeys = Object.keys(farms).sort(function(a,b){return farms[b]-farms[a];});
+  var farmHtml = '';
+  if(farmKeys.length){
+    var maxKg = farms[farmKeys[0]];
+    farmHtml = '<div style="margin-bottom:10px">'+
+      '<div style="font-size:8.5px;color:#6B7A8D;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:Space Grotesk,sans-serif">น้ำหนักแยกฟาร์ม (kg)</div>'+
+      farmKeys.slice(0,8).map(function(farm){
+        var pct2=maxKg>0?Math.round(farms[farm]/maxKg*100):0;
+        return '<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">'+
+          '<span style="font-weight:600;color:#E8ECF1">'+esc(farm)+'</span>'+
+          '<span style="font-family:JetBrains Mono,monospace;color:#FFB800;font-size:10px">'+fmt(farms[farm],1)+' kg</span></div>'+
+          '<div style="background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden">'+
+          '<div style="width:'+pct2+'%;background:#FFB800;height:100%;border-radius:3px"></div></div></div>';
+      }).join('')+'</div>';
+  }
+
+  // ── Table ─────────────────────────────────────────────────────────
+  var tableHtml = '';
+  if(!rows.length){
+    // Show first 5 raw rows to diagnose column issues
+    var sample5 = spData.slice(0,5);
+    var sampleKeys = sample5[0]?Object.keys(sample5[0]).slice(0,6):[];
+    // Try to find any date-like value in first rows
+    var rawDateSamples = sample5.map(function(r){
+      var k=Object.keys(r).find(function(k){return k.indexOf('วันที่')>=0||k.indexOf('date')>=0;});
+      return k?r[k]:'?';
+    });
+    // Find the actual date column by scanning column values for date patterns
+    var dateColFound = '';
+    if(sample5.length){
+      var allKeys = Object.keys(sample5[0]);
+      allKeys.forEach(function(k){
+        if(!dateColFound){
+          var v=sample5[0][k]||'';
+          if(String(v).match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)){ dateColFound=k; }
+        }
+      });
+    }
+    // Auto-fix: if we found a date column different from RMCOL.date, use it
+    var effectiveDateCol = dateColFound || RMCOL.date;
+    var availDates3 = [...new Set(spData.map(function(r){
+      return parseSpDate(r[effectiveDateCol]||rmGet(r,RMCOL.date)||'');
+    }).filter(Boolean))].sort();
+    var recentDates = availDates3.slice(-5).reverse();
+    var dateButtons = recentDates.map(function(d){
+      return '<button onclick="spFilterDate=\''+d+'\';renderProcSection();" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:2px 8px;color:#00E5FF;font-size:11px;cursor:pointer;margin:2px">'+d+'</button>';
+    }).join('');
+
+    var diagHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:10px">'+
+      '<div style="color:#FFB800;font-weight:700;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
+      '<div style="font-family:JetBrains Mono,monospace;line-height:1.7;color:#6B7A8D">'+
+      'spData rows: <b style="color:#E8ECF1">'+spData.length+'</b>  |  '+
+      'Date col (RMCOL): <span style="color:#7B61FF">'+esc(RMCOL.date.slice(-20))+'</span><br>'+
+      'Auto-detected date col: <span style="color:'+(dateColFound?'#00D68F':'#FF4757')+'">'+esc(dateColFound||'not found')+'</span><br>'+
+      'Unique dates found: <b style="color:'+(availDates3.length>0?'#00D68F':'#FF4757')+'">'+availDates3.length+'</b>'+
+      (availDates3.length?'  Range: <b style="color:#00E5FF">'+availDates3[0]+' → '+availDates3[availDates3.length-1]+'</b>':'')+
+      '<br>Sample date values: <span style="color:#FFB800">'+rawDateSamples.slice(0,3).map(esc).join(' | ')+'</span>'+
+      '</div></div>';
+
+    tableHtml = diagHtml+
+      '<div style="color:#6B7A8D;text-align:center;padding:12px;font-size:12px">'+
+      (spData.length?
+        'ไม่มีข้อมูล'+(spFilterDate?' วันที่ <b style="color:#E8ECF1">'+spFilterDate+'</b>':''):
+        'ยังไม่มีข้อมูลใน spData')+
+      (recentDates.length?'<div style="margin-top:8px;font-size:11px">วันที่มีข้อมูล: '+dateButtons+'</div>':
+       '<div style="margin-top:6px;color:#FF4757;font-size:11px">ไม่พบวันที่ในข้อมูล — column date ไม่ match</div>')+
+      '</div>';
+  } else {
+    var wantedCols=[RMCOL.date,RMCOL.farmCode,RMCOL.supplier,RMCOL.rmType,RMCOL.shrimpType,RMCOL.size,RMCOL.buyWt,RMCOL.actualWt,RMCOL.price,RMCOL.cost];
+    var shownCols=[];
+    wantedCols.forEach(function(wc){
+      var k=Object.keys(rows[0]||{}).find(function(k){return k.toLowerCase()===wc.toLowerCase();});
+      if(k&&rows.some(function(r){return r[k]&&r[k]!=='';})&&shownCols.indexOf(k)<0) shownCols.push(k);
+    });
+    if(shownCols.length<3) shownCols=Object.keys(rows[0]||{}).slice(0,8);
+    var hdTh = shownCols.map(function(k){
+      var label=k.replace(/รับวัตถุดิบทุกประเภท\[|\]/g,'').replace(/\[/g,'').toUpperCase();
+      return '<th>'+esc(label)+'</th>';
+    }).join('');
+    var rowsHtml = rows.slice(0,200).map(function(r){
+      return '<tr>'+shownCols.map(function(k){
+        var v=r[k]||'—';
+        var isNum=!isNaN(parseFloat(v))&&v!=='—';
+        var color=(k.indexOf('น้ำหนักซื้อ')>=0||k.indexOf('buyWt')>=0)?'#FFB800':
+                  (k.indexOf('ราคา')>=0||k.indexOf('price')>=0||k.indexOf('มูลค่า')>=0)?'#00D68F':'';
+        return '<td style="'+(color?'color:'+color+';':'')+( isNum?'font-family:JetBrains Mono,monospace;text-align:right;':'')+'">'+esc(v)+'</td>';
+      }).join('')+'</tr>';
+    }).join('');
+    tableHtml = '<div class="tw" style="max-height:350px;overflow-y:auto">'+
+      '<table><thead><tr>'+hdTh+'</tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+      (rows.length>200?'<div style="font-size:9px;color:#6B7A8D;text-align:center;margin-top:4px">แสดง 200 / '+rows.length.toLocaleString()+' แถว</div>':'');
+  }
+
+  return '<div id="spSection">'+filterUI+statusHtml+countBadge+kpiHtml+rmTypeHtml+farmHtml+tableHtml+'</div>';
 }
 
 // ── BIND EVENTS ─────────────────────────────────────────────────────
