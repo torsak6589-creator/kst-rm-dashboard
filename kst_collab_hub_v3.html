@@ -502,6 +502,39 @@ function spGetStr(r, keywords){
   return k ? (r[k]||'') : '';
 }
 
+function bindSPButtons(){
+  // Date filter
+  var spDtInp=document.getElementById('spDateInp');
+  if(spDtInp) spDtInp.onchange=function(){spFilterDate=this.value;renderProcSection();};
+  var spBtnT=document.getElementById('spBtnToday');
+  if(spBtnT) spBtnT.onclick=function(){spFilterDate=tod();renderProcSection();};
+  var spBtnY=document.getElementById('spBtnYest');
+  if(spBtnY) spBtnY.onclick=function(){spFilterDate=yest();renderProcSection();};
+  var spBtnA=document.getElementById('spBtnAll');
+  if(spBtnA) spBtnA.onclick=function(){spFilterDate='';renderProcSection();};
+  // Type filters
+  var selRm=document.getElementById('spSelRmType');
+  if(selRm) selRm.onchange=function(){spFilterRmType=this.value;renderProcSection();};
+  var selSh=document.getElementById('spSelShrimp');
+  if(selSh) selSh.onchange=function(){spFilterShrimp=this.value;renderProcSection();};
+  // Fetch / refresh
+  var b;
+  b=document.getElementById('btnSPFetch');    if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPRefresh');  if(b) b.onclick=fetchRMReceive;
+  b=document.getElementById('btnSPRetry');    if(b) b.onclick=function(){spError=null;fetchRMReceive();};
+  b=document.getElementById('btnSPRedirect'); if(b) b.onclick=getSPTokenViaRedirect;
+  b=document.getElementById('btnSPLogout');
+  if(b) b.onclick=function(){
+    var app=getMSAL();
+    if(app){var accts=app.getAllAccounts();if(accts.length){try{app.logout({account:accts[0]});}catch(e){spError=null;spData=null;render();}}}
+  };
+  b=document.getElementById('btnCopyUri');
+  if(b) b.onclick=function(){
+    navigator.clipboard.writeText(window.location.href.split('?')[0]).then(function(){
+      b.textContent='✓ Copied!';setTimeout(function(){b.textContent='📋 Copy URI';},2000);
+    });
+  };
+}
 function renderProcSection(){
   var el=document.getElementById('spSection');
   if(el) el.innerHTML=buildSPSection();
