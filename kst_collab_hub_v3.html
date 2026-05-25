@@ -923,13 +923,27 @@ function renderSPWidget(){
   '</div>';
 
   // ── KPI ───────────────────────────────────────────────────────────
-  var totKg   = rows.reduce(function(a,r){return a+rmNum(r,RMCOL.buyWt);},0);
-  var totCost = rows.reduce(function(a,r){return a+rmNum(r,RMCOL.cost);},0);
+  // Flexible column getter — try RMCOL then scan all numeric columns
+  function getKg(r){
+    var v=rmNum(r,RMCOL.buyWt);
+    if(v) return v;
+    // fallback: find largest numeric value column
+    var maxV=0;
+    Object.keys(r).forEach(function(k){
+      if(k.indexOf('น้ำหนัก')>=0||k.indexOf('weight')>=0||k.indexOf('_kg_')>=0||k.indexOf('wt')>=0){
+        var n=parseFloat(r[k]);if(!isNaN(n)&&n>maxV)maxV=n;
+      }
+    });
+    return maxV;
+  }
+  function getCost(r){ return rmNum(r,RMCOL.cost)||rmNum(r,'[มูลค่าซื้อ]'); }
+  var totKg   = rows.reduce(function(a,r){return a+getKg(r);},0);
+  var totCost = rows.reduce(function(a,r){return a+getCost(r);},0);
   var farms={}, rmTypes={};
   rows.forEach(function(r){
-    var farm = rmGet(r,RMCOL.farmCode)||rmGet(r,RMCOL.supplier);
-    var rmt  = rmGet(r,RMCOL.rmType);
-    var kg   = rmNum(r,RMCOL.buyWt);
+    var farm = rmGet(r,RMCOL.farmCode)||rmGet(r,RMCOL.supplier)||'Unknown';
+    var rmt  = rmGet(r,RMCOL.rmType)||'—';
+    var kg   = getKg(r);
     if(farm) farms[farm]=(farms[farm]||0)+kg;
     if(rmt)  rmTypes[rmt]=(rmTypes[rmt]||0)+kg;
   });
@@ -972,13 +986,53 @@ function renderSPWidget(){
   // ── Table ─────────────────────────────────────────────────────────
   var tableHtml = '';
   if(!rows.length){
-    var availDates3 = [...new Set(spData.map(function(r){return parseSpDate(rmGet(r,RMCOL.date));}).filter(Boolean))].sort().slice(-5).reverse();
-    var dateButtons = availDates3.map(function(d){
+    // Show first 5 raw rows to diagnose column issues
+    var sample5 = spData.slice(0,5);
+    var sampleKeys = sample5[0]?Object.keys(sample5[0]).slice(0,6):[];
+    // Try to find any date-like value in first rows
+    var rawDateSamples = sample5.map(function(r){
+      var k=Object.keys(r).find(function(k){return k.indexOf('วันที่')>=0||k.indexOf('date')>=0;});
+      return k?r[k]:'?';
+    });
+    // Find the actual date column by scanning column values for date patterns
+    var dateColFound = '';
+    if(sample5.length){
+      var allKeys = Object.keys(sample5[0]);
+      allKeys.forEach(function(k){
+        if(!dateColFound){
+          var v=sample5[0][k]||'';
+          if(String(v).match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)){ dateColFound=k; }
+        }
+      });
+    }
+    // Auto-fix: if we found a date column different from RMCOL.date, use it
+    var effectiveDateCol = dateColFound || RMCOL.date;
+    var availDates3 = [...new Set(spData.map(function(r){
+      return parseSpDate(r[effectiveDateCol]||rmGet(r,RMCOL.date)||'');
+    }).filter(Boolean))].sort();
+    var recentDates = availDates3.slice(-5).reverse();
+    var dateButtons = recentDates.map(function(d){
       return '<button onclick="spFilterDate=\''+d+'\';renderProcSection();" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:2px 8px;color:#00E5FF;font-size:11px;cursor:pointer;margin:2px">'+d+'</button>';
     }).join('');
-    tableHtml = '<div style="color:#6B7A8D;text-align:center;padding:16px;font-size:12px">'+
-      'ไม่มีข้อมูล'+(spFilterDate?' วันที่ <b style="color:#E8ECF1">'+spFilterDate+'</b>':'')+
-      (availDates3.length?'<div style="margin-top:8px">วันที่มีข้อมูล: '+dateButtons+'</div>':'')+
+
+    var diagHtml = '<div style="background:rgba(255,184,0,0.06);border:1px solid rgba(255,184,0,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:10px">'+
+      '<div style="color:#FFB800;font-weight:700;margin-bottom:5px;font-family:Space Grotesk,sans-serif">🔍 DIAGNOSTIC</div>'+
+      '<div style="font-family:JetBrains Mono,monospace;line-height:1.7;color:#6B7A8D">'+
+      'spData rows: <b style="color:#E8ECF1">'+spData.length+'</b>  |  '+
+      'Date col (RMCOL): <span style="color:#7B61FF">'+esc(RMCOL.date.slice(-20))+'</span><br>'+
+      'Auto-detected date col: <span style="color:'+(dateColFound?'#00D68F':'#FF4757')+'">'+esc(dateColFound||'not found')+'</span><br>'+
+      'Unique dates found: <b style="color:'+(availDates3.length>0?'#00D68F':'#FF4757')+'">'+availDates3.length+'</b>'+
+      (availDates3.length?'  Range: <b style="color:#00E5FF">'+availDates3[0]+' → '+availDates3[availDates3.length-1]+'</b>':'')+
+      '<br>Sample date values: <span style="color:#FFB800">'+rawDateSamples.slice(0,3).map(esc).join(' | ')+'</span>'+
+      '</div></div>';
+
+    tableHtml = diagHtml+
+      '<div style="color:#6B7A8D;text-align:center;padding:12px;font-size:12px">'+
+      (spData.length?
+        'ไม่มีข้อมูล'+(spFilterDate?' วันที่ <b style="color:#E8ECF1">'+spFilterDate+'</b>':''):
+        'ยังไม่มีข้อมูลใน spData')+
+      (recentDates.length?'<div style="margin-top:8px;font-size:11px">วันที่มีข้อมูล: '+dateButtons+'</div>':
+       '<div style="margin-top:6px;color:#FF4757;font-size:11px">ไม่พบวันที่ในข้อมูล — column date ไม่ match</div>')+
       '</div>';
   } else {
     var wantedCols=[RMCOL.date,RMCOL.farmCode,RMCOL.supplier,RMCOL.rmType,RMCOL.shrimpType,RMCOL.size,RMCOL.buyWt,RMCOL.actualWt,RMCOL.price,RMCOL.cost];
