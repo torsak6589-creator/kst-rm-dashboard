@@ -274,6 +274,7 @@ let spData = null;     // rows from SharePoint
 let spLastFetch = null;
 let spError = null;
 let spDebug = {};      // diagnostic info
+let spFilterDate     = '';   // วันที่ filter (SP section only)
 let spFilterRmType   = '';   // ประเภทการซื้อ filter
 let spFilterShrimp   = '';   // ชนิดกุ้ง filter
 
@@ -556,6 +557,7 @@ function fmt(n,d){d=d||0;if(n==null||isNaN(n))return '—';return Number(n).toLo
 function pct(n){if(n==null||isNaN(n))return '—';return n.toFixed(1)+'%';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function tod(){return new Date().toISOString().slice(0,10);}
+function yest(){var d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
 function ts(d){return new Date(d).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
 function spv(sz){return SPEC[sz]||SPEC['31/40'];}
 function fd(){
@@ -843,8 +845,9 @@ function renderPlanning(){
 function renderSPWidget(){
   var dbg = typeof spDebug !== 'undefined' ? spDebug : {};
   var dateToShow = filterDate; // empty = ทั้งหมด
-  // Get rows by date then apply SP filters
-  var baseRows = spData ? (dateToShow ? spForDate(dateToShow) : spData.slice()) : null;
+  // SP section uses its own date filter (independent of page filter)
+  var spDate = spFilterDate || dateToShow || '';
+  var baseRows = spData ? (spDate ? spForDate(spDate) : spData.slice()) : null;
   var rows = baseRows ? baseRows.filter(function(r){
     if(spFilterRmType && rmGet(r,RMCOL.rmType).toLowerCase().indexOf(spFilterRmType.toLowerCase()) < 0) return false;
     if(spFilterShrimp && rmGet(r,RMCOL.shrimpType).toLowerCase().indexOf(spFilterShrimp.toLowerCase()) < 0) return false;
@@ -916,14 +919,31 @@ function renderSPWidget(){
       allRmTypes.map(function(t){ return '<option value="'+t+'"'+(t===spFilterRmType?' selected':'')+'>'+t+'</option>'; }).join('');
     var shOpts  = '<option value="">-- ทุกชนิดกุ้ง --</option>'+
       allShrimps.map(function(t){ return '<option value="'+t+'"'+(t===spFilterShrimp?' selected':'')+'>'+t+'</option>'; }).join('');
-    filterBarHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:8px 0 10px;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px">'+
-      '<div style="flex:1;min-width:160px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ประเภทการซื้อ</div>'+
-        '<select id="spSelRmType" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+rmOpts+'</select></div>'+
-      '<div style="flex:1;min-width:140px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ชนิดกุ้ง</div>'+
-        '<select id="spSelShrimp" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+shOpts+'</select></div>'+
-      (spFilterRmType||spFilterShrimp?'<button onclick="spFilterRmType=\'\';spFilterShrimp=\'\';renderProcSection();" class="btn btn-g btn-sm" style="height:30px;align-self:flex-end">✕ ล้าง Filter</button>':'')+
-      '<div style="font-size:9px;color:#6B7A8D;align-self:flex-end;padding-bottom:4px;font-family:JetBrains Mono,monospace">'+
-        (rows?rows.length:0)+' / '+(baseRows?baseRows.length:0)+' แถว'+
+    var hasAnyFilter = spFilterDate||spFilterRmType||spFilterShrimp;
+    var spDateDisp = spFilterDate||(dateToShow||'');
+    filterBarHtml =
+      // Row 1: Date filter
+      '<div style="background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">'+
+        '<div><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">📅 วันที่รับ RM</div>'+
+          '<input type="date" id="spDateInp" value="'+spFilterDate+'" style="background:rgba(10,15,30,0.85);border:1px solid '+(spFilterDate?'rgba(0,229,255,0.5)':'rgba(0,229,255,0.2)')+';border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:JetBrains Mono,monospace"></div>'+
+        '<button id="spBtnToday" class="btn btn-c btn-sm" style="align-self:flex-end">วันนี้</button>'+
+        '<button id="spBtnYest" class="btn btn-g btn-sm" style="align-self:flex-end">เมื่อวาน</button>'+
+        '<button id="spBtnAll" class="btn btn-g btn-sm" style="align-self:flex-end">ทั้งหมด</button>'+
+        (spFilterDate?'<span style="font-size:9px;color:#00E5FF;align-self:flex-end;padding-bottom:4px;font-family:JetBrains Mono,monospace">กรอง: '+spFilterDate+'</span>':'<span style="font-size:9px;color:#6B7A8D;align-self:flex-end;padding-bottom:4px">ทุกวัน</span>')+
+      '</div>'+
+      // Row 2: RM Type + Shrimp Type
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
+        '<div style="flex:1;min-width:160px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ประเภทการซื้อ</div>'+
+          '<select id="spSelRmType" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+rmOpts+'</select></div>'+
+        '<div style="flex:1;min-width:140px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ชนิดกุ้ง</div>'+
+          '<select id="spSelShrimp" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+shOpts+'</select></div>'+
+        '<div style="font-family:JetBrains Mono,monospace;font-size:10px;align-self:flex-end;padding-bottom:4px">'+
+          '<span style="color:'+(rows&&rows.length>0?'#00D68F':'#6B7A8D')+'">'+
+          (rows?rows.length:0).toLocaleString()+'</span>'+
+          '<span style="color:#6B7A8D"> / '+(spData?spData.length:0).toLocaleString()+' แถว</span>'+
+        '</div>'+
+        (hasAnyFilter?'<button onclick="spFilterDate=\'\';spFilterRmType=\'\';spFilterShrimp=\'\';renderProcSection();" class="btn btn-e btn-sm" style="align-self:flex-end">✕ ล้างทั้งหมด</button>':'')+
       '</div>'+
       '</div>';
   }
@@ -1050,6 +1070,15 @@ function renderSPWidget(){
 
 function bindSPButtons(){
   var b;
+  // Bind SP date filter
+  var spDtInp = document.getElementById('spDateInp');
+  if(spDtInp) spDtInp.onchange = function(){ spFilterDate = this.value; renderProcSection(); };
+  var spBtnT = document.getElementById('spBtnToday');
+  if(spBtnT) spBtnT.onclick = function(){ spFilterDate = tod(); renderProcSection(); };
+  var spBtnY = document.getElementById('spBtnYest');
+  if(spBtnY) spBtnY.onclick = function(){ spFilterDate = yest(); renderProcSection(); };
+  var spBtnA = document.getElementById('spBtnAll');
+  if(spBtnA) spBtnA.onclick = function(){ spFilterDate = ''; renderProcSection(); };
   // Bind SP filter dropdowns
   var selRm = document.getElementById('spSelRmType');
   if(selRm) selRm.onchange = function(){ spFilterRmType = this.value; renderProcSection(); };
