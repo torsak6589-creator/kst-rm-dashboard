@@ -1185,11 +1185,19 @@ function renderSPWidget(){
     } else if(spError==='popup_blocked'){
       errContent='<div style="color:#FFB800;font-size:12px;font-weight:700;margin-bottom:6px">⚠ Browser บล็อก Popup</div><div style="display:flex;gap:8px"><button id="btnSPRedirect" class="btn btn-w btn-sm">🔐 Login Redirect</button><button id="btnSPRetry" class="btn btn-g btn-sm">↺ ลองอีกครั้ง</button></div>';
     } else {
-      errContent='<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ เกิดข้อผิดพลาด</div><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;word-break:break-all;margin-bottom:8px">'+esc(spError)+'</div><button id="btnSPRetry" class="btn btn-e btn-sm">↺ ลองใหม่</button>';
+      errContent='<div style="color:#FF4757;font-size:12px;font-weight:700;margin-bottom:6px">⚠ เกิดข้อผิดพลาด</div><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#6B7A8D;word-break:break-all;margin-bottom:8px">'+esc(spError)+'</div>'+
+        '<div style="display:flex;gap:8px">'+
+        '<button onclick="spError=null;fetchRMReceive();" class="btn btn-e btn-sm">↺ ลองใหม่</button>'+
+        '<button onclick="spError=null;spData=null;render();" class="btn btn-g btn-sm">⇠ Re-login</button>'+
+        '</div>';
     }
     statusHtml = '<div style="background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:9px;padding:12px 14px;margin-bottom:8px">'+errContent+'</div>';
   } else if(!spData){
-    statusHtml = '<div style="padding:12px;text-align:center"><button id="btnSPFetch" class="btn btn-c" style="gap:8px">🔄 ดึงข้อมูล RM Receive จาก SharePoint</button><div style="color:#6B7A8D;font-size:10px;margin-top:6px">ksthatyai365 | sheet: rm recive | Procurement_Master_File.xlsx</div></div>';
+    statusHtml = '<div style="padding:12px;text-align:center">'+
+      '<button id="btnSPFetch" onclick="fetchRMReceive()" class="btn btn-c" style="gap:8px;font-size:13px;padding:10px 24px">'+
+      '🔄 ดึงข้อมูล RM Receive จาก SharePoint</button>'+
+      '<div style="color:#6B7A8D;font-size:10px;margin-top:6px">ksthatyai365 | sheet: rm recive | Procurement_Master_File.xlsx</div>'+
+      '</div>';
     return '<div id="spSection">'+filterUI+statusHtml+'</div>';
   } else {
     var lastFetchStr = spLastFetch?spLastFetch.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
@@ -1200,8 +1208,8 @@ function renderSPWidget(){
       '<span style="color:#00D68F">●</span>'+
       '<span style="color:#6B7A8D">ดึงล่าสุด: '+lastFetchStr+'</span>'+
       '<span style="font-family:JetBrains Mono,monospace;color:#00E5FF;font-size:9px">'+totalRows.toLocaleString()+' แถว | ล่าสุด: '+latestDate+'</span>'+
-      '<button id="btnSPRefresh" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
-      '<button id="btnSPLogout" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
+      '<button id="btnSPRefresh" onclick="fetchRMReceive()" class="btn btn-g btn-sm" style="margin-left:auto;padding:2px 8px;font-size:9px">↺ Refresh</button>'+
+      '<button id="btnSPLogout" onclick="spError=null;spData=null;render();" class="btn btn-g btn-sm" style="padding:2px 8px;font-size:9px">⇠ Re-login</button>'+
       '</div>';
   }
 
@@ -1541,6 +1549,11 @@ function bindAll(){
 }
 
 // ── BOOT ─────────────────────────────────────────────────────────────
+// Expose SP functions globally for onclick handlers
+window.fetchRMReceive = function(){ return fetchRMReceive(); };
+window.renderProcSection = function(){ return renderProcSection(); };
+window.switchRole = function(r){ return switchRole(r); };
+
 window.addEventListener('DOMContentLoaded',function(){
   // Handle MSAL redirect response (after loginRedirect)
   if(typeof msal !== 'undefined'){
