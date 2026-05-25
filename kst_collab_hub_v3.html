@@ -274,6 +274,8 @@ let spData = null;     // rows from SharePoint
 let spLastFetch = null;
 let spError = null;
 let spDebug = {};      // diagnostic info
+let spFilterRmType   = '';   // ประเภทการซื้อ filter
+let spFilterShrimp   = '';   // ชนิดกุ้ง filter
 
 function getMSAL(){
   if(!msalApp){ try{ msalApp=new msal.PublicClientApplication(MSAL_CFG); }catch(e){ console.error('MSAL init:',e); } }
@@ -841,7 +843,13 @@ function renderPlanning(){
 function renderSPWidget(){
   var dbg = typeof spDebug !== 'undefined' ? spDebug : {};
   var dateToShow = filterDate; // empty = ทั้งหมด
-  var rows = spData ? (dateToShow ? spForDate(dateToShow) : spData) : null;
+  // Get rows by date then apply SP filters
+  var baseRows = spData ? (dateToShow ? spForDate(dateToShow) : spData.slice()) : null;
+  var rows = baseRows ? baseRows.filter(function(r){
+    if(spFilterRmType && rmGet(r,RMCOL.rmType).toLowerCase().indexOf(spFilterRmType.toLowerCase()) < 0) return false;
+    if(spFilterShrimp && rmGet(r,RMCOL.shrimpType).toLowerCase().indexOf(spFilterShrimp.toLowerCase()) < 0) return false;
+    return true;
+  }) : null;
 
   // ── Status bar
   var statusHtml = '';
@@ -898,6 +906,27 @@ function renderSPWidget(){
       '</div>';
   }
 
+  // ── Filter bar (ประเภทการซื้อ + ชนิดกุ้ง) ─────────────────────────
+  var filterBarHtml = '';
+  if(spData && spData.length){
+    // Build unique options from ALL data (not filtered) for dropdowns
+    var allRmTypes  = [...new Set(spData.map(function(r){return rmGet(r,RMCOL.rmType);}).filter(Boolean))].sort();
+    var allShrimps  = [...new Set(spData.map(function(r){return rmGet(r,RMCOL.shrimpType);}).filter(Boolean))].sort();
+    var rmOpts  = '<option value="">-- ทุกประเภทการซื้อ --</option>'+
+      allRmTypes.map(function(t){ return '<option value="'+t+'"'+(t===spFilterRmType?' selected':'')+'>'+t+'</option>'; }).join('');
+    var shOpts  = '<option value="">-- ทุกชนิดกุ้ง --</option>'+
+      allShrimps.map(function(t){ return '<option value="'+t+'"'+(t===spFilterShrimp?' selected':'')+'>'+t+'</option>'; }).join('');
+    filterBarHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:8px 0 10px;border-bottom:1px solid rgba(0,229,255,0.1);margin-bottom:10px">'+
+      '<div style="flex:1;min-width:160px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ประเภทการซื้อ</div>'+
+        '<select id="spSelRmType" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+rmOpts+'</select></div>'+
+      '<div style="flex:1;min-width:140px"><div style="font-size:8.5px;color:#6B7A8D;font-family:Space Grotesk,sans-serif;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ชนิดกุ้ง</div>'+
+        '<select id="spSelShrimp" style="width:100%;background:rgba(10,15,30,0.85);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:5px 9px;font-size:11px;color:#E8ECF1;outline:none;font-family:Noto Sans Thai,sans-serif">'+shOpts+'</select></div>'+
+      (spFilterRmType||spFilterShrimp?'<button onclick="spFilterRmType=\'\';spFilterShrimp=\'\';renderProcSection();" class="btn btn-g btn-sm" style="height:30px;align-self:flex-end">✕ ล้าง Filter</button>':'')+
+      '<div style="font-size:9px;color:#6B7A8D;align-self:flex-end;padding-bottom:4px;font-family:JetBrains Mono,monospace">'+
+        (rows?rows.length:0)+' / '+(baseRows?baseRows.length:0)+' แถว'+
+      '</div>'+
+      '</div>';
+  }
   if(!rows) return '<div id="spSection">'+statusHtml+'</div>';
 
   // ── Today's summary
@@ -1016,11 +1045,16 @@ function renderSPWidget(){
       hintHtml+'</div>';
   }
 
-  return '<div id="spSection">'+statusHtml+kpiHtml+szBarHtml+tableHtml+'</div>';
+  return '<div id="spSection">'+statusHtml+filterBarHtml+kpiHtml+szBarHtml+tableHtml+'</div>';
 }
 
 function bindSPButtons(){
   var b;
+  // Bind SP filter dropdowns
+  var selRm = document.getElementById('spSelRmType');
+  if(selRm) selRm.onchange = function(){ spFilterRmType = this.value; renderProcSection(); };
+  var selSh = document.getElementById('spSelShrimp');
+  if(selSh) selSh.onchange = function(){ spFilterShrimp = this.value; renderProcSection(); };
   b=document.getElementById('btnSPFetch');    if(b) b.onclick=fetchRMReceive;
   b=document.getElementById('btnSPLogout');
   if(b) b.onclick=function(){
