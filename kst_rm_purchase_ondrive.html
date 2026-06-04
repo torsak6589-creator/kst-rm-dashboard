@@ -7,31 +7,31 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KST RM">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#B5780A">
+<meta name="theme-color" content="#4F46E5">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KST — Procurement Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --navy:#F4F6F9;--navy2:#EAECF0;--navy3:#DDE1E8;
-  --gold:#B5780A;--gold-lt:#8B5E08;--gold-dim:rgba(181,120,10,.10);
-  --cyan:#0277BD;--green:#00897B;--red:#D32F2F;--amber:#E65100;
-  --text:#1A202C;--muted:#4A5568;--border:rgba(0,0,0,.12);
-  --card:rgba(255,255,255,.95);--r:12px;
+  --navy:#EEF0F6;--navy2:#E5E7F0;--navy3:#EDEEF5;
+  --gold:#4F46E5;--gold-lt:#4338CA;--gold-dim:rgba(79,70,229,.10);
+  --cyan:#06B6D4;--green:#10B981;--red:#F43F5E;--amber:#F59E0B;
+  --text:#1E2235;--muted:#6B7191;--border:rgba(30,34,53,.12);
+  --card:#FFFFFF;--r:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{background:#F0F2F5;color:var(--text);font-family:"Space Grotesk","Noto Sans Thai",sans-serif;font-size:14px;min-height:100vh}
+html,body{background:#EEF0F6;color:var(--text);font-family:"Manrope","IBM Plex Sans Thai",sans-serif;font-size:14px;min-height:100vh}
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 60% 40% at 10% 20%,rgba(181,120,10,.04) 0,transparent 60%),
-             radial-gradient(ellipse 50% 50% at 90% 80%,rgba(2,119,189,.03) 0,transparent 60%)}
+  background:radial-gradient(ellipse 60% 40% at 10% 20%,rgba(79,70,229,.04) 0,transparent 60%),
+             radial-gradient(ellipse 50% 50% at 90% 80%,rgba(6,182,212,.03) 0,transparent 60%)}
 
 /* ── AUTH ── */
-#authScreen{position:fixed;inset:0;z-index:999;background:rgba(240,242,245,.98);
+#authScreen{position:fixed;inset:0;z-index:999;background:rgba(238,240,246,.98);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-.auth-logo{width:72px;height:72px;border-radius:14px;overflow:hidden;box-shadow:0 0 28px rgba(200,152,42,.4)}
+.auth-logo{width:72px;height:72px;border-radius:14px;overflow:hidden;box-shadow:0 0 28px rgba(79,70,229,.4)}
 .auth-logo img{width:100%;height:100%;object-fit:cover}
 .auth-title{font-size:20px;font-weight:700;color:var(--gold-lt);text-align:center}
 .auth-sub{font-size:12px;color:var(--muted);text-align:center;max-width:340px;line-height:1.6}
@@ -65,7 +65,7 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 
 /* ── TABS ── */
 .tab-bar{position:sticky;top:61px;z-index:9;display:flex;gap:0;
-  background:rgba(13,27,46,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
+  background:rgba(255,255,255,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
 .tab-btn{flex:1;padding:11px 8px;font-size:12px;font-weight:600;font-family:inherit;
   background:none;border:none;color:var(--muted);cursor:pointer;
   border-bottom:2px solid transparent;transition:all .2s;text-align:center}
@@ -75,22 +75,22 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 /* ── FILTER BAR ── */
 .filterbar{position:sticky;top:104px;z-index:8;display:flex;align-items:center;
   gap:8px;flex-wrap:wrap;padding:7px 22px;
-  background:rgba(13,27,46,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
+  background:rgba(255,255,255,.96);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
 .fl{font-size:10px;color:var(--muted);white-space:nowrap}
 select,input[type=date]{background:var(--navy3);color:var(--text);
   border:1px solid var(--border);border-radius:5px;padding:4px 7px;
   font-size:10px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .2s}
 select:hover,input[type=date]:hover{border-color:var(--gold)}
-.btn-primary{background:linear-gradient(135deg,#C8982A,#8B6318);color:#fff;
+.btn-primary{background:linear-gradient(135deg,#4F46E5,#4338CA);color:#fff;
   border:none;border-radius:5px;padding:4px 12px;font-size:10px;
   font-family:inherit;font-weight:600;cursor:pointer;transition:opacity .2s}
 .btn-sec{background:none;color:var(--muted);border:1px solid var(--border);
   border-radius:5px;padding:4px 9px;font-size:10px;font-family:inherit;cursor:pointer}
-.btn-refresh{background:rgba(0,200,151,.1);color:var(--green);
-  border:1px solid rgba(0,200,151,.3);border-radius:5px;padding:4px 10px;
+.btn-refresh{background:rgba(16,185,129,.1);color:var(--green);
+  border:1px solid rgba(16,185,129,.3);border-radius:5px;padding:4px 10px;
   font-size:10px;font-family:inherit;cursor:pointer}
 .fstatus{margin-left:auto;font-size:9px;color:var(--muted)}
-#loadBar{height:2px;background:linear-gradient(90deg,#C8982A,#00BCD4);width:0;
+#loadBar{height:2px;background:linear-gradient(90deg,#4F46E5,#06B6D4);width:0;
   transition:width .3s;position:sticky;top:140px;z-index:7}
 
 /* ── TAB CONTENT ── */
@@ -100,14 +100,15 @@ select:hover,input[type=date]:hover{border-color:var(--gold)}
 /* ── KPI ── */
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
-  padding:12px 14px;position:relative;overflow:hidden;transition:border-color .2s}
-.kpi:hover{border-color:var(--gold)}
+  padding:12px 14px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s;
+  box-shadow:0 1px 2px rgba(30,34,53,.04),0 2px 8px rgba(30,34,53,.04)}
+.kpi:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(79,70,229,.10)}
 .kpi::after{content:"";position:absolute;top:0;left:0;right:0;height:2px}
-.cg::after{background:linear-gradient(90deg,#C8982A,transparent)}
-.cc::after{background:linear-gradient(90deg,#00BCD4,transparent)}
-.cn::after{background:linear-gradient(90deg,#00C897,transparent)}
-.cr::after{background:linear-gradient(90deg,#FF4757,transparent)}
-.ca::after{background:linear-gradient(90deg,#FFB800,transparent)}
+.cg::after{background:linear-gradient(90deg,#4F46E5,transparent)}
+.cc::after{background:linear-gradient(90deg,#06B6D4,transparent)}
+.cn::after{background:linear-gradient(90deg,#10B981,transparent)}
+.cr::after{background:linear-gradient(90deg,#F43F5E,transparent)}
+.ca::after{background:linear-gradient(90deg,#F59E0B,transparent)}
 .kpi-lbl{font-size:9px;color:var(--muted);font-weight:500;margin-bottom:4px}
 .kpi-val{font-size:22px;font-weight:700;line-height:1.1}
 .cg .kpi-val{color:var(--gold-lt)}.cc .kpi-val{color:var(--cyan)}
@@ -115,14 +116,14 @@ select:hover,input[type=date]:hover{border-color:var(--gold)}
 .kpi-sub{font-size:9px;color:var(--muted);margin-top:2px}
 .delta{display:inline-flex;align-items:center;gap:2px;font-size:9px;font-weight:600;
   padding:2px 5px;border-radius:7px;margin-top:4px}
-.up{background:rgba(0,200,151,.14);color:var(--green)}
+.up{background:rgba(16,185,129,.14);color:var(--green)}
 .dn{background:rgba(255,71,87,.14);color:var(--red)}
 
 /* ── CHARTS ── */
 .row2{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:14px}
 .row2b{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .row3{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-bottom:14px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:0 1px 2px rgba(30,34,53,.04),0 2px 10px rgba(30,34,53,.04)}
 .ct{font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:2px}
 .ct .d{width:5px;height:5px;border-radius:50%;background:var(--gold)}
 .cs{font-size:9px;color:var(--muted);margin-bottom:10px}
@@ -134,22 +135,22 @@ table{width:100%;border-collapse:collapse}
 thead tr{border-bottom:1px solid var(--border)}
 th{font-size:9px;color:var(--muted);font-weight:600;text-align:left;
   padding:6px 7px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px}
-td{font-size:10px;padding:7px 7px;border-bottom:1px solid rgba(200,152,42,.05)}
+td{font-size:10px;padding:7px 7px;border-bottom:1px solid rgba(79,70,229,.05)}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(200,152,42,.03)}
+tr:hover td{background:rgba(79,70,229,.03)}
 .tag{display:inline-block;padding:1px 6px;border-radius:7px;font-size:8px;font-weight:600}
 .tg{background:var(--gold-dim);color:var(--gold-lt)}
-.tb{background:rgba(0,188,212,.12);color:var(--cyan)}
-.tn{background:rgba(0,200,151,.12);color:var(--green)}
+.tb{background:rgba(6,182,212,.12);color:var(--cyan)}
+.tn{background:rgba(16,185,129,.12);color:var(--green)}
 .tr2{background:rgba(255,71,87,.12);color:var(--red)}
-.ta{background:rgba(255,184,0,.12);color:var(--amber)}
+.ta{background:rgba(245,158,11,.12);color:var(--amber)}
 
 /* ── KPI BADGE ── */
 .kpi-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
   border-radius:12px;font-size:10px;font-weight:700}
-.kb-green{background:rgba(0,200,151,.15);color:var(--green);border:1px solid rgba(0,200,151,.3)}
+.kb-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
 .kb-red{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3)}
-.kb-amber{background:rgba(255,184,0,.15);color:var(--amber);border:1px solid rgba(255,184,0,.3)}
+.kb-amber{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
 
 /* ── FOOTER ── */
 .footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
@@ -178,7 +179,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <button class="btn-ms" onclick="signIn()" id="btnLogin">
     <div class="ms-icon"></div>Sign in with Microsoft 365
   </button>
-  <button onclick="useSnapshot()" style="background:rgba(200,152,42,.15);border:1px solid var(--gold);
+  <button onclick="useSnapshot()" style="background:rgba(79,70,229,.15);border:1px solid var(--gold);
     color:var(--gold-lt);border-radius:8px;padding:10px 24px;font-size:13px;font-weight:600;
     font-family:inherit;cursor:pointer;margin-top:-8px;transition:opacity .2s"
     onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
@@ -205,7 +206,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <div class="hdr-right">
     <!-- PWA install button: shown only after login & on supported browsers -->
     <button id="installBtn" onclick="installApp()" aria-label="ติดตั้งแอปพลิเคชัน KST" style="display:none;align-items:center;gap:6px;
-      background:linear-gradient(135deg,#C8982A,#8B6318);color:#fff;border:none;border-radius:6px;
+      background:linear-gradient(135deg,#4F46E5,#4338CA);color:#fff;border:none;border-radius:6px;
       padding:5px 12px;font-size:10px;font-weight:600;font-family:inherit;cursor:pointer;">
       📲 ติดตั้ง App
     </button>
@@ -254,16 +255,16 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <button class="btn-sec" onclick="resetFilter()" aria-label="รีเซ็ตตัวกรอง">↺ Reset</button>
   <button class="btn-refresh" onclick="refreshAll()" aria-label="รีเฟรชข้อมูลจาก OneDrive">🔄 Refresh</button>
   <button id="snapFallbackBtn" onclick="forceSnapshot()" style="display:none;
-    background:rgba(255,184,0,.15);color:var(--amber);border:1px solid rgba(255,184,0,.4);
+    background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.4);
     border-radius:5px;padding:4px 10px;font-size:10px;font-family:inherit;cursor:pointer">
     📊 ใช้ Snapshot
   </button>
   <span class="fstatus" id="fstatus">—</span>
   <span id="dataBadge" style="font-size:9px;padding:2px 8px;border-radius:8px;
-    background:rgba(0,200,151,.12);color:var(--green);border:1px solid rgba(0,200,151,.25);
+    background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25);
     display:none">✅ Live</span>
   <span id="snapBadge" style="font-size:9px;padding:2px 8px;border-radius:8px;
-    background:rgba(255,184,0,.12);color:var(--amber);border:1px solid rgba(255,184,0,.25);
+    background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25);
     display:none">📊 Snapshot</span>
 </div>
 <div id="loadBar"></div>
@@ -459,7 +460,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <!-- FOOTER -->
 <div class="footer">
   <span>บริษัท ห้องเย็นโชติวัฒน์หาดใหญ่ จำกัด (มหาชน) | Branch KH</span>
-  <span>Report by Torsak Arunpan &nbsp;|&nbsp; KST Procurement Dashboard v17 (UI improved)</span>
+  <span>Report by Torsak Arunpan &nbsp;|&nbsp; KST Procurement Dashboard v17</span>
   <span id="footerTs">—</span>
 </div>
 
@@ -481,7 +482,7 @@ const CFG2 = {
   sheetPrice:   'ราคา  RM คิดขาย',
   sheetReceive: 'RM-RECIVE',
 };
-const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_v16.html';
+const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_v17.html';
 const SCOPES = 'Files.Read User.Read offline_access';
 const TENANT = '1a4d139b-4e96-4d3b-8cfd-007453cc609e';
 const CLIENT = '2459a57b-bd24-4c19-8f82-1b1d607bd11a';
@@ -997,24 +998,24 @@ function _rb(cid,key,cfg){if(charts[key])charts[key].destroy();charts[key]=new C
 function _dailyChart(){
   const m={};filteredRM.forEach(r=>{if(!m[r.date])m[r.date]={l:0,d:0};r.typeRM.includes('เป็น')?m[r.date].l+=r.weight:m[r.date].d+=r.weight;});
   const L=Object.keys(m).sort();
-  _rb('cDaily','daily',{type:'bar',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>m[d].l),backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},{label:'กุ้งดอง',data:L.map(d=>m[d].d),backgroundColor:'rgba(0,188,212,.65)',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:15,color:'#7A8CA3',font:{size:9}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cDaily','daily',{type:'bar',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>m[d].l),backgroundColor:'rgba(79,70,229,.75)',borderRadius:2},{label:'กุ้งดอง',data:L.map(d=>m[d].d),backgroundColor:'rgba(6,182,212,.65)',borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:15,color:'#7A8CA3',font:{size:9}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
 }
 function _typeDonut(){
   const t={};filteredRM.forEach(r=>{const k=r.typeRM.includes('เป็น')?'กุ้งเป็น':'กุ้งดอง';t[k]=(t[k]||0)+r.weight;});
   const L=Object.keys(t),D=L.map(k=>t[k]),tot=D.reduce((s,v)=>s+v,0);
-  const C=['rgba(200,152,42,.85)','rgba(0,188,212,.8)'];
+  const C=['rgba(79,70,229,.85)','rgba(6,182,212,.8)'];
   _rb('cType','type',{type:'doughnut',data:{labels:L,datasets:[{data:D,backgroundColor:C,borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${_fK(ctx.parsed)} กก. (${tot?(ctx.parsed/tot*100).toFixed(1):0}%)`}}}}});
   document.getElementById('typeLegs').innerHTML=L.map((l,i)=>`<div style="display:flex;align-items:center;gap:4px;font-size:9px"><span style="width:7px;height:7px;border-radius:50%;background:${C[i]};display:inline-block"><\/span>${l} <b style="color:var(--text)">${tot?(t[l]/tot*100).toFixed(1):0}%<\/b><\/div>`).join('');
 }
 function _priceChart(){
   const m={};filteredRM.forEach(r=>{if(!r.price||!r.date)return;const k=r.typeRM.includes('เป็น')?'l':'d';if(!m[r.date])m[r.date]={l:[],d:[]};m[r.date][k].push(r.price);});
   const L=Object.keys(m).sort(),avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
-  _rb('cPrice','price',{type:'line',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>avg(m[d].l)),borderColor:'#C8982A',backgroundColor:'rgba(200,152,42,.08)',tension:.4,fill:true,pointRadius:0,spanGaps:true},{label:'กุ้งดอง',data:L.map(d=>avg(m[d].d)),borderColor:'#00BCD4',backgroundColor:'rgba(0,188,212,.06)',tension:.4,fill:true,pointRadius:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:12,color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cPrice','price',{type:'line',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>avg(m[d].l)),borderColor:'#4F46E5',backgroundColor:'rgba(79,70,229,.08)',tension:.4,fill:true,pointRadius:0,spanGaps:true},{label:'กุ้งดอง',data:L.map(d=>avg(m[d].d)),borderColor:'#06B6D4',backgroundColor:'rgba(6,182,212,.06)',tension:.4,fill:true,pointRadius:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:12,color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
 }
 function _supBarChart(){
   const m={};filteredRM.forEach(r=>{m[r.supplier]=(m[r.supplier]||0)+r.weight;});
   const S=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  _rb('cSupBar','supbar',{type:'bar',data:{labels:S.map(([k])=>k.length>14?k.slice(0,13)+'…':k),datasets:[{label:'ปริมาณ',data:S.map(([,v])=>v),backgroundColor:S.map((_,i)=>`hsl(${38+i*5},65%,${55-i*2}%)`),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}},y:{grid:{display:false},ticks:{color:'#E8ECF1',font:{size:8}}}}}});
+  _rb('cSupBar','supbar',{type:'bar',data:{labels:S.map(([k])=>k.length>14?k.slice(0,13)+'…':k),datasets:[{label:'ปริมาณ',data:S.map(([,v])=>v),backgroundColor:S.map((_,i)=>`hsl(${243+i*3},58%,${64-i*2}%)`),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#6B7191',font:{size:9}}},y:{grid:{display:false},ticks:{color:'#4A5568',font:{size:8}}}}}});
 }
 function _supTable(){
   const m={};filteredRM.forEach(r=>{if(!m[r.supplier])m[r.supplier]={vol:0,val:0,p:[],ty:new Set(),n:0};const s=m[r.supplier];s.vol+=r.weight;s.val+=r.value;s.n++;if(r.price)s.p.push(r.price);s.ty.add(r.typeRM);});
@@ -1024,7 +1025,7 @@ function _supTable(){
     const rk=i+1,pct=(tot?(d.vol/tot*100).toFixed(1):'0'),avgP=(d.p.length?d.p.reduce((a,b)=>a+b,0)/d.p.length:0);
     const bw=Math.min(Math.round(d.vol/maxV*80),80),mt=[...d.ty].find(t=>t.includes('เป็น'))||[...d.ty][0]||'—';
     const tc=mt.includes('เป็น')?'tg':'tb';
-    return `<tr><td><b>${rk}<\/b><\/td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}<\/td><td><span class="tag ${tc}">${mt}<\/span><\/td><td>${d.vol.toLocaleString()}<\/td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#C8982A,#E5B84A)"><\/div>${pct}%<\/div><\/td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}<\/td><td>${_fM(d.val)}<\/td><td>${d.n}<\/td><\/tr>`;
+    return `<tr><td><b>${rk}<\/b><\/td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}<\/td><td><span class="tag ${tc}">${mt}<\/span><\/td><td>${d.vol.toLocaleString()}<\/td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#4F46E5,#6366F1)"><\/div>${pct}%<\/div><\/td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}<\/td><td>${_fM(d.val)}<\/td><td>${d.n}<\/td><\/tr>`;
   }).join('');
 }
 
@@ -1082,8 +1083,8 @@ function _renderSizePrice(){
         {
           label:'ราคาเฉลี่ย (฿/กก.)',
           data:avgPrices.map(p=>p.toFixed(1)),
-          backgroundColor:'rgba(200,152,42,.7)',
-          borderColor:'#E5B84A',
+          backgroundColor:'rgba(79,70,229,.7)',
+          borderColor:'#6366F1',
           borderWidth:1,
           borderRadius:4,
           yAxisID:'y'
@@ -1124,7 +1125,7 @@ function _renderSizePrice(){
       '<td style="color:var(--muted)">฿ '+minP.toFixed(0)+'<\/td>'+
       '<td style="color:var(--muted)">฿ '+maxP.toFixed(0)+'<\/td>'+
       '<td>'+d.count+'<\/td>'+
-      '<td><div style="width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl('+hue+',70%,55%),rgba(200,152,42,.3))"><\/div><\/td>'+
+      '<td><div style="width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl('+hue+',70%,55%),rgba(79,70,229,.3))"><\/div><\/td>'+
       '<\/tr>';
   }).join('');
 }
@@ -1172,8 +1173,8 @@ function _renderTab2(fr,to,ty,sp){
   _rb('cPlanDaily','planD',{type:'bar',
     data:{labels:Lp.map(d=>d.slice(5)),
       datasets:[
-        {label:'กุ้งเป็น',data:Lp.map(d=>md[d].live),  backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},
-        {label:'กุ้งดอง', data:Lp.map(d=>md[d].broker),backgroundColor:'rgba(0,188,212,.65)',borderRadius:2}
+        {label:'กุ้งเป็น',data:Lp.map(d=>md[d].live),  backgroundColor:'rgba(79,70,229,.75)',borderRadius:2},
+        {label:'กุ้งดอง', data:Lp.map(d=>md[d].broker),backgroundColor:'rgba(6,182,212,.65)',borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
@@ -1186,7 +1187,7 @@ function _renderTab2(fr,to,ty,sp){
   const tp={};
   pf.forEach(r=>{const k=_normalizeType(r.typeRM)||'อื่นๆ';tp[k]=(tp[k]||0)+r.weight;});
   const Ltp=Object.keys(tp),Dtp=Ltp.map(k=>tp[k]);
-  const COLS=['rgba(200,152,42,.85)','rgba(0,188,212,.8)','rgba(0,200,151,.7)','rgba(255,184,0,.7)'];
+  const COLS=['rgba(79,70,229,.85)','rgba(6,182,212,.8)','rgba(16,185,129,.7)','rgba(245,158,11,.7)'];
   _rb('cPlanType','planType',{type:'doughnut',
     data:{labels:Ltp,datasets:[{data:Dtp,backgroundColor:COLS.slice(0,Ltp.length),borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',
@@ -1227,11 +1228,11 @@ function _renderTab3(ty,sp){
   const mplan={},mact={};
   filtAct.forEach(d=>{mplan[d.month]=(mplan[d.month]||0)+d.planVol;mact[d.month]=(mact[d.month]||0)+d.actVol;});
   const Lm=months.filter(m=>mplan[m]||mact[m]);
-  _rb('cActMonth','actM',{type:'bar',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:[{label:'แผน',data:Lm.map(m=>mplan[m]||0),backgroundColor:'rgba(200,152,42,.5)',borderRadius:3},{label:'จริง',data:Lm.map(m=>mact[m]||0),backgroundColor:'rgba(0,200,151,.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
+  _rb('cActMonth','actM',{type:'bar',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:[{label:'แผน',data:Lm.map(m=>mplan[m]||0),backgroundColor:'rgba(79,70,229,.5)',borderRadius:3},{label:'จริง',data:Lm.map(m=>mact[m]||0),backgroundColor:'rgba(16,185,129,.7)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>(v/1000).toFixed(0)+'K',color:'#7A8CA3',font:{size:9}}}}}});
   // Price line
   const mPrice={};filtAct.forEach(d=>{if(!mPrice[d.month])mPrice[d.month]={};mPrice[d.month][d.type]=d.avgPrice;});
   const types=[...new Set(filtAct.map(d=>d.type))];
-  const TC=['#C8982A','#00BCD4','#00C897'];
+  const TC=['#4F46E5','#06B6D4','#10B981'];
   _rb('cActPrice','actP',{type:'line',data:{labels:Lm.map(m=>m.slice(0,3)),datasets:types.map((t,i)=>{return{label:t,data:Lm.map(m=>(mPrice[m]&&mPrice[m][t])||null),borderColor:TC[i%3],backgroundColor:TC[i%3]+'22',tension:.4,fill:false,pointRadius:3,spanGaps:true};})  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9},color:'#7A8CA3'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#4A5568',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
   // Table
   const actRows=filtAct.filter(d=>d.actVol>0||d.planVol>0);
@@ -1340,8 +1341,8 @@ function _renderTab5(){
   _rb('cRcTrend','rcTrend',{type:'line',
     data:{labels:days.map(d=>d.slice(5)),
       datasets:[
-        {label:'ราคาถ่วงน้ำหนักจริง',data:trendActual,borderColor:'#C8982A',tension:.3,pointRadius:3,spanGaps:true},
-        {label:'ราคาคาดการณ์',data:trendForecast,borderColor:'#00BCD4',tension:.3,borderDash:[5,3],pointRadius:0,spanGaps:true}
+        {label:'ราคาถ่วงน้ำหนักจริง',data:trendActual,borderColor:'#4F46E5',tension:.3,pointRadius:3,spanGaps:true},
+        {label:'ราคาคาดการณ์',data:trendForecast,borderColor:'#06B6D4',tension:.3,borderDash:[5,3],pointRadius:0,spanGaps:true}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
@@ -1366,8 +1367,8 @@ function _renderTab5(){
   _rb('cRcSize','rcSz',{type:'bar',
     data:{labels:sizeKeys,
       datasets:[
-        {label:'ราคาถ่วงน้ำหนักจริง',data:sizeActual,backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},
-        {label:'ราคาคาดการณ์',data:sizeForecast,backgroundColor:'rgba(0,188,212,.5)',borderRadius:2}
+        {label:'ราคาถ่วงน้ำหนักจริง',data:sizeActual,backgroundColor:'rgba(79,70,229,.75)',borderRadius:2},
+        {label:'ราคาคาดการณ์',data:sizeForecast,backgroundColor:'rgba(6,182,212,.5)',borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
@@ -1446,8 +1447,8 @@ function _renderTab4(){
   _rb('cPriceSize','prSz',{type:'bar',
     data:{labels:sizes,
       datasets:[
-        {label:'กุ้งขาวสด',data:sizeData.map(r=>r[3]||null),backgroundColor:'rgba(200,152,42,.75)',borderRadius:2},
-        {label:'กุ้งดำสด',  data:sizeData.map(r=>r[5]||null),backgroundColor:'rgba(0,200,151,.65)', borderRadius:2}
+        {label:'กุ้งขาวสด',data:sizeData.map(r=>r[3]||null),backgroundColor:'rgba(79,70,229,.75)',borderRadius:2},
+        {label:'กุ้งดำสด',  data:sizeData.map(r=>r[5]||null),backgroundColor:'rgba(16,185,129,.65)', borderRadius:2}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
@@ -1471,8 +1472,8 @@ function _renderTab4(){
   _rb('cPriceTrend','prTrend',{type:'line',
     data:{labels:trendMons.map(m=>m.slice(0,3)),
       datasets:[
-        {label:'กุ้งขาวสด',data:trendWF,borderColor:'#C8982A',tension:.4,pointRadius:4,spanGaps:true},
-        {label:'กุ้งดำสด', data:trendBF,borderColor:'#00C897',tension:.4,pointRadius:4,spanGaps:true}
+        {label:'กุ้งขาวสด',data:trendWF,borderColor:'#4F46E5',tension:.4,pointRadius:4,spanGaps:true},
+        {label:'กุ้งดำสด', data:trendBF,borderColor:'#10B981',tension:.4,pointRadius:4,spanGaps:true}
       ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},
@@ -1536,8 +1537,8 @@ const hideAuth=()=>document.getElementById('authScreen').style.display='none';
 // Hidden div to show dash content on successful auth
 document.body.insertAdjacentHTML('beforeend','<div id="dashContent2" style="display:none"><\/div>');
 
-Chart.defaults.color='#7A8CA3';
-Chart.defaults.font.family="'Space Grotesk','Noto Sans Thai',sans-serif";
+Chart.defaults.color='#6B7191';
+Chart.defaults.font.family="'Manrope','IBM Plex Sans Thai',sans-serif";
 Chart.defaults.font.size=11;
 
 /* ── Use Snapshot without login ── */
