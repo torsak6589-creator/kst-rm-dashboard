@@ -45,51 +45,51 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 /* ── TOPBAR ── */
 .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;
   justify-content:space-between;padding:10px 22px;
-  background:rgba(255,255,255,.97);border-bottom:1px solid rgba(0,0,0,.10);backdrop-filter:blur(10px);box-shadow:0 1px 8px rgba(0,0,0,.08)}
+  background:#1E1B4B;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 2px 12px rgba(15,12,40,.25)}
 .brand{display:flex;align-items:center;gap:10px}
 .brand-logo{width:38px;height:38px;border-radius:7px;overflow:hidden}
 .brand-logo img{width:100%;height:100%;object-fit:cover}
-.brand-name{font-size:15px;font-weight:700;color:var(--gold)}
-.brand-sub{font-size:9px;color:var(--muted)}
-.hdr-mid{font-size:13px;font-weight:600;text-align:center}
-.hdr-mid span{display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px}
+.brand-name{font-size:15px;font-weight:700;color:#fff}
+.brand-sub{font-size:9px;color:#A5B4FC}
+.hdr-mid{font-size:13px;font-weight:600;text-align:center;color:#E0E7FF}
+.hdr-mid span{display:block;font-size:9px;color:#A5B4FC;font-weight:400;margin-top:1px}
 .hdr-right{display:flex;align-items:center;gap:8px}
-.badge{background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold-lt);
+.badge{background:rgba(129,140,248,.18);border:1px solid rgba(129,140,248,.55);color:#C7D2FE;
   padding:2px 9px;border-radius:10px;font-size:9px;font-weight:600}
 .dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);
   box-shadow:0 0 5px var(--green);animation:pulse 2s infinite}
-.btn-out{background:none;border:1px solid var(--border);color:var(--muted);
+.btn-out{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);color:#C7D2FE;
   border-radius:5px;padding:3px 9px;font-size:10px;font-family:inherit;cursor:pointer}
-.btn-out:hover{color:var(--text)}
+.btn-out:hover{color:#fff;background:rgba(255,255,255,.12)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ── TABS ── */
 .tab-bar{position:sticky;top:61px;z-index:9;display:flex;gap:0;
-  background:rgba(255,255,255,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
+  background:#211E52;border-bottom:1px solid rgba(255,255,255,.07)}
 .tab-btn{flex:1;padding:11px 8px;font-size:12px;font-weight:600;font-family:inherit;
-  background:none;border:none;color:var(--muted);cursor:pointer;
+  background:none;border:none;color:#A5B4FC;cursor:pointer;
   border-bottom:2px solid transparent;transition:all .2s;text-align:center}
-.tab-btn:hover{color:var(--text)}
-.tab-btn.active{color:var(--gold-lt);border-bottom-color:var(--gold)}
+.tab-btn:hover{color:#fff;background:rgba(255,255,255,.04)}
+.tab-btn.active{color:#fff;border-bottom-color:#818CF8;background:rgba(129,140,248,.14)}
 
 /* ── FILTER BAR ── */
 .filterbar{position:sticky;top:104px;z-index:8;display:flex;align-items:center;
   gap:8px;flex-wrap:wrap;padding:7px 22px;
-  background:rgba(255,255,255,.96);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
-.fl{font-size:10px;color:var(--muted);white-space:nowrap}
-select,input[type=date]{background:var(--navy3);color:var(--text);
-  border:1px solid var(--border);border-radius:5px;padding:4px 7px;
+  background:#272356;border-bottom:1px solid rgba(255,255,255,.07)}
+.fl{font-size:10px;color:#C7D2FE;white-space:nowrap}
+select,input[type=date]{background:rgba(255,255,255,.08);color:#E0E7FF;
+  border:1px solid rgba(255,255,255,.20);border-radius:5px;padding:4px 7px;
   font-size:10px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .2s}
-select:hover,input[type=date]:hover{border-color:var(--gold)}
-.btn-primary{background:linear-gradient(135deg,#4F46E5,#4338CA);color:#fff;
+select:hover,input[type=date]:hover{border-color:#818CF8}
+.btn-primary{background:linear-gradient(135deg,#6366F1,#4F46E5);color:#fff;
   border:none;border-radius:5px;padding:4px 12px;font-size:10px;
-  font-family:inherit;font-weight:600;cursor:pointer;transition:opacity .2s}
-.btn-sec{background:none;color:var(--muted);border:1px solid var(--border);
+  font-family:inherit;font-weight:600;cursor:pointer;transition:opacity .2s;box-shadow:0 2px 8px rgba(99,102,241,.4)}
+.btn-sec{background:rgba(255,255,255,.06);color:#C7D2FE;border:1px solid rgba(255,255,255,.20);
   border-radius:5px;padding:4px 9px;font-size:10px;font-family:inherit;cursor:pointer}
-.btn-refresh{background:rgba(16,185,129,.1);color:var(--green);
-  border:1px solid rgba(16,185,129,.3);border-radius:5px;padding:4px 10px;
+.btn-refresh{background:rgba(52,211,153,.16);color:#6EE7B7;
+  border:1px solid rgba(52,211,153,.4);border-radius:5px;padding:4px 10px;
   font-size:10px;font-family:inherit;cursor:pointer}
-.fstatus{margin-left:auto;font-size:9px;color:var(--muted)}
+.fstatus{margin-left:auto;font-size:9px;color:#A5B4FC}
 #loadBar{height:2px;background:linear-gradient(90deg,#4F46E5,#06B6D4);width:0;
   transition:width .3s;position:sticky;top:140px;z-index:7}
 
@@ -179,13 +179,13 @@ tr:hover td{background:rgba(79,70,229,.03)}
   <button class="btn-ms" onclick="signIn()" id="btnLogin">
     <div class="ms-icon"></div>Sign in with Microsoft 365
   </button>
-  <button onclick="useSnapshot()" style="background:rgba(79,70,229,.15);border:1px solid var(--gold);
-    color:var(--gold-lt);border-radius:8px;padding:10px 24px;font-size:13px;font-weight:600;
-    font-family:inherit;cursor:pointer;margin-top:-8px;transition:opacity .2s"
-    onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+  <button onclick="useSnapshot()" style="background:var(--gold);border:1px solid var(--gold-lt);
+    color:#fff;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:700;
+    font-family:inherit;cursor:pointer;margin-top:-4px;box-shadow:0 4px 14px rgba(79,70,229,.35);transition:opacity .2s"
+    onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
     📊 ดูข้อมูล Snapshot (ไม่ต้อง Login)
   </button>
-  <div style="font-size:9px;color:#3A4E68;margin-top:-12px">✓ v16 — SharePoint</div>
+  <div style="font-size:10px;color:var(--muted);font-weight:500;margin-top:-8px">✓ v17 — SharePoint</div>
   <div id="authStatus" style="font-size:10px;color:var(--muted);text-align:center">
     Snapshot: ข้อมูล ณ 14 พ.ค. 2569 | 4,268 รายการ
   </div>
