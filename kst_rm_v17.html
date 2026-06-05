@@ -63,14 +63,44 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 .btn-out:hover{color:var(--text)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* ── TABS ── */
-.tab-bar{position:sticky;top:61px;z-index:9;display:flex;gap:0;
-  background:rgba(13,27,46,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(8px)}
-.tab-btn{flex:1;padding:11px 8px;font-size:12px;font-weight:600;font-family:inherit;
-  background:none;border:none;color:var(--muted);cursor:pointer;
-  border-bottom:2px solid transparent;transition:all .2s;text-align:center}
-.tab-btn:hover{color:var(--text)}
-.tab-btn.active{color:var(--gold-lt);border-bottom-color:var(--gold)}
+/* ── TABS (3D raised buttons) ── */
+.tab-bar{position:sticky;top:61px;z-index:9;display:flex;gap:8px;
+  background:rgba(13,27,46,.95);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(8px);padding:9px 12px}
+.tab-btn{flex:1;padding:11px 8px;font-size:12px;font-weight:700;font-family:inherit;
+  cursor:pointer;text-align:center;border-radius:9px;
+  /* inactive: visible raised button with contrasting fill */
+  color:#E8EDF4;
+  background:linear-gradient(180deg,#2A3B54,#1B2942);
+  border:1px solid rgba(255,255,255,.10);
+  border-top-color:rgba(255,255,255,.18);
+  box-shadow:0 3px 0 rgba(0,0,0,.45), 0 4px 8px rgba(0,0,0,.35),
+             inset 0 1px 0 rgba(255,255,255,.10);
+  transition:transform .12s, box-shadow .12s, background .2s, color .2s;
+  transform:translateY(0)}
+.tab-btn:hover{
+  background:linear-gradient(180deg,#324567,#22324d);
+  color:#fff}
+.tab-btn:active{
+  transform:translateY(2px);
+  box-shadow:0 1px 0 rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.3),
+             inset 0 1px 0 rgba(255,255,255,.08)}
+.tab-btn.active{
+  color:#3A2A08;
+  background:linear-gradient(180deg,#E8C260,#C8982A);
+  border:1px solid #B5780A;
+  border-top-color:#F2D58A;
+  box-shadow:0 3px 0 #8B6318, 0 5px 10px rgba(181,120,10,.45),
+             inset 0 1px 0 rgba(255,255,255,.45);
+  text-shadow:0 1px 0 rgba(255,255,255,.25)}
+.tab-btn.active:active{
+  transform:translateY(2px);
+  box-shadow:0 1px 0 #8B6318, 0 2px 5px rgba(181,120,10,.4),
+             inset 0 1px 0 rgba(255,255,255,.4)}
+@media(max-width:640px){
+  .tab-bar{gap:5px;padding:7px 8px;overflow-x:auto}
+  .tab-btn{font-size:11px;padding:9px 6px;min-width:max-content}
+}
 
 /* ── FILTER BAR ── */
 .filterbar{position:sticky;top:104px;z-index:8;display:flex;align-items:center;
