@@ -1,7 +1,8 @@
-const CACHE_NAME = 'kst-rm-v16';
+const CACHE_NAME = 'kst-rm-v17';
 const STATIC_ASSETS = [
-  './kst_rm_purchase_ondrive.html',
+  './kst_rm_v17.html',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
 ];
 
 self.addEventListener('install', e => {
@@ -41,6 +42,6 @@ self.addEventListener('fetch', e => {
         return res;
       })
       .catch(() => caches.match(e.request)
-        .then(cached => cached || caches.match('./kst_rm_purchase_ondrive.html')))
+        .then(cached => cached || caches.match('./kst_rm_v17.html')))
   );
 });

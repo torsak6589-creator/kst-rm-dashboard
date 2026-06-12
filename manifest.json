@@ -2,7 +2,7 @@
   "name": "KST RM — Procurement Dashboard",
   "short_name": "KST RM",
   "description": "ระบบรายงานการซื้อวัตถุดิบ KST ห้องเย็นโชติวัฒน์หาดใหญ่",
-  "start_url": "./kst_rm_purchase_ondrive.html",
+  "start_url": "./kst_rm_v17.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
