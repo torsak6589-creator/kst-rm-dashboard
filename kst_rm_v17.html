@@ -497,11 +497,15 @@ tr:hover td{background:rgba(200,152,42,.03)}
 console.log('%c[KST] BUILD v17.4-tzfix2 (12/06/2026)', 'color:#C8982A;font-weight:bold');
 /* ══════ CONFIG ══════ */
 const CFG1 = {
-  /* ไฟล์จริงที่ AppSheet เขียน — sourcedoc GUID 28D0D235 (ยืนยันจาก AppSheet) */
-  driveId:'',
-  fileId: '',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L3IvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL19sYXlvdXRzLzE1L0RvYy5hc3B4P3NvdXJjZWRvYz0lN0IyOEQwRDIzNS00QTA4LTQ1NTEtODQ2Ny1GOUNFQzFENEEwQUUlN0QmZmlsZT1BREQlMjAoNSkueGxzeCZhY3Rpb249ZGVmYXVsdCZtb2JpbGVyZWRpcmVjdD10cnVl',
-  sheet: 'RM RECORD',
+  /* ใช้ SharePoint site drive แทน personal OneDrive
+     เพื่อให้ผู้ใช้ทุกคนในองค์กรเข้าถึงข้อมูลได้เหมือนกัน */
+  /* SharePoint site KSTRMUPDATEV2 > Shared Documents (ทุกคนในองค์กรเข้าถึงได้) */
+  driveId:  'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
+  fileId:   '',
+  filePath: 'ADD (5).xlsx',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQTEwdEFvQ0VwUlJZUm4tYzdCMUtDdUFUSkZLTmM4SU5xUmtMekZyYi1nRzJjP2U9U2lscmxh',
+  sheet:    'RM RECORD',
+  sheetAlt: 'SOURCE',
 };
 const CFG2 = {
   driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
@@ -556,7 +560,7 @@ async function _handleCB(){
     sessionStorage.setItem('kst_rt',d.refresh_token||'');
     sessionStorage.setItem('kst_exp',Date.now()+(d.expires_in-60)*1000);
     window.history.replaceState({},'',REDIRECT_URI);
-    if(d.id_token){try{const pl=JSON.parse(atob(d.id_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));document.getElementById('userLabel').textContent=pl.preferred_username||'';}catch(_){}}
+    if(d.id_token){try{const pl=JSON.parse(atob(d.id_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));const un=pl.preferred_username||pl.email||'';document.getElementById('userLabel').textContent=un;sessionStorage.setItem('kst_user',un);}catch(_){}}
     sessionStorage.removeItem('pkce_v');sessionStorage.removeItem('pkce_s');
     return true;
   }catch(e){setAS('❌ '+e.message);return true;}
@@ -664,6 +668,18 @@ async function fetchSheet(cfg, sheet){
   }catch(e){
     errors.push('Direct: '+e.message);
     console.warn('[KST] Direct failed:', e.message);
+  }
+
+  /* ── Strategy 1b: Path-based via driveId + filePath (SharePoint) ── */
+  try{
+    if(!cfg.driveId || !cfg.filePath) throw new Error('skip — no filePath');
+    const enc_p = encodeURIComponent(cfg.filePath);
+    const r = await graphGet('/drives/'+cfg.driveId+'/root:/'+enc_p+':/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 15000);
+    console.log('[KST] ✅ Path Workbook OK:', sheet, (r.values||[]).length, 'rows');
+    return r.values||[];
+  }catch(e){
+    errors.push('Path: '+e.message);
+    console.warn('[KST] Path failed:', e.message);
   }
 
   if(cfg.sharingToken){
@@ -814,7 +830,14 @@ async function loadAll(){
   try{
     // ── RM RECORD ──
     setLB(20);
-    const rows = await fetchSheet(CFG1, CFG1.sheet);
+    let rows;
+    try{ rows = await fetchSheet(CFG1, CFG1.sheet); }
+    catch(e1){
+      if(CFG1.sheetAlt){
+        console.warn('[KST] sheet primary failed, trying sheetAlt:', e1.message);
+        rows = await fetchSheet(CFG1, CFG1.sheetAlt);
+      } else { throw e1; }
+    }
     if(rows && rows.length > 1){
       _detectCols(rows[0]);
       const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
