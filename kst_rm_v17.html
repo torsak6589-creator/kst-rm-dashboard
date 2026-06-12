@@ -496,11 +496,10 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <script>
 /* ══════ CONFIG ══════ */
 const CFG1 = {
-  /* ── ชี้ไฟล์จริงที่ AppSheet เขียน (OneDrive: Torsak) ──
-     driveId/fileId เว้นว่างเพื่อข้าม site copy — ใช้ sharingToken เป็นหลัก */
+  /* ไฟล์จริงที่ AppSheet เขียน — sourcedoc GUID 28D0D235 (ยืนยันจาก AppSheet) */
   driveId:'',
   fileId: '',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0RvY3VtZW50cy9BREQlMjAoNSkueGxzeA',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L3IvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL19sYXlvdXRzLzE1L0RvYy5hc3B4P3NvdXJjZWRvYz0lN0IyOEQwRDIzNS00QTA4LTQ1NTEtODQ2Ny1GOUNFQzFENEEwQUUlN0QmZmlsZT1BREQlMjAoNSkueGxzeCZhY3Rpb249ZGVmYXVsdCZtb2JpbGVyZWRpcmVjdD10cnVl',
   sheet: 'RM RECORD',
 };
 const CFG2 = {
@@ -632,12 +631,27 @@ async function fetchSheet(cfg, sheet){
     }
 
     /* ── Strategy 3: downloadUrl → SheetJS (ไม่ต้อง site member) ── */
+    /* Step 0: /content โดยตรง (วิธีเดียวกับ KST-RM UPDATE V2 — ใช้ได้กับ AAD) */
+    try{
+      const res0 = await _fetchTimeout(
+        'https://graph.microsoft.com/v1.0/shares/'+cfg.sharingToken+'/driveItem/content',
+        {headers:{Authorization:'Bearer '+tok}, redirect:'follow'}, 30000);
+      if(res0.ok){
+        const rows0 = await _xlsxToRows(await res0.arrayBuffer(), sheet);
+        console.log('[KST] ✅ direct /content OK:', sheet, rows0.length, 'rows');
+        return rows0;
+      }
+      errors.push('Content: HTTP '+res0.status);
+    }catch(e){
+      errors.push('Content: '+e.message);
+      console.warn('[KST] direct /content failed:', e.message);
+    }
     try{
       // Step A: resolve sharing item + get downloadUrl
       const meta = await graphGet('/shares/'+cfg.sharingToken+
-        '/driveItem?$select=id,name,parentReference,@microsoft.graph.downloadUrl,@content.downloadUrl', 12000);
+        '/driveItem?$select=id,name,parentReference', 12000);
       const dlUrl = meta['@microsoft.graph.downloadUrl']
-                 || meta['@content.downloadUrl'];
+                 || meta['@content.downloadUrl'] || null;
 
       if(dlUrl){
         const res = await _fetchTimeout(dlUrl, {}, 30000);
