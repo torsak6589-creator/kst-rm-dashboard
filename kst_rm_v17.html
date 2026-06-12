@@ -602,6 +602,23 @@ async function graphGet(path, ms=15000){
   }
 }
 
+/* แปลง xlsx ArrayBuffer → rows (array of arrays) format เดียวกับ Workbook API */
+function _xlsxToRows(buffer, sheetName){
+  const wb = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true });
+  const ws = wb.Sheets[sheetName] || wb.Sheets[wb.SheetNames[0]];
+  if (!ws) throw new Error('sheet "' + sheetName + '" not found');
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+  /* date → "YYYY-MM-DD" string ให้ตรง format เดิม */
+  return rows.map(r => r.map(c => {
+    if (c instanceof Date && !isNaN(c)) {
+      return c.getFullYear() + '-' +
+             String(c.getMonth() + 1).padStart(2, '0') + '-' +
+             String(c.getDate()).padStart(2, '0');
+    }
+    return c;
+  }));
+}
+
 /* fetch พร้อม timeout — helper ที่ Strategy 3 ต้องใช้ */
 async function _fetchTimeout(url, opts, ms){
   const ctrl = new AbortController();
