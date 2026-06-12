@@ -606,7 +606,7 @@ async function fetchSheet(cfg, sheet){
   const tok   = await _getToken();
   const errors = [];
 
-  /* ── Strategy 1: Workbook API (personal OneDrive / direct) ── */
+  /* ─ Strategy 1: Direct Workbook API (owner personal OneDrive) ─ */
   try{
     const r = await graphGet('/drives/'+cfg.driveId+'/items/'+cfg.fileId+
       '/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 15000);
@@ -614,54 +614,58 @@ async function fetchSheet(cfg, sheet){
     return r.values||[];
   }catch(e){
     errors.push('Direct: '+e.message);
-    console.warn('[KST] Direct failed:', e.message);
+    console.warn('[KST] Strategy1 failed:', sheet, e.message);
   }
 
-  if(cfg.sharingToken){
-    /* ── Strategy 2: Workbook API via Sharing Token ── */
+  const sToken = cfg.sharingToken || cfg.tokenPrice;
+  if(sToken){
+    /* ─ Strategy 2: Workbook via Sharing Token ─ */
     try{
-      const r = await graphGet('/shares/'+cfg.sharingToken+
+      const r = await graphGet('/shares/'+sToken+
         '/driveItem/workbook/worksheets/'+enc_s+'/usedRange?$select=values', 15000);
       console.log('[KST] ✅ Token Workbook OK:', sheet, (r.values||[]).length, 'rows');
       return r.values||[];
-    }catch(e){
-      errors.push('Token: '+e.message);
-    }
+    }catch(e){ errors.push('Wbk: '+e.message); }
 
-    /* ── Strategy 3: downloadUrl → SheetJS (ไม่ต้อง site member) ── */
+    /* ─ Strategy 3: /shares/{token}/driveItem/content → SheetJS ─ */
     try{
-      // Step A: resolve sharing item + get downloadUrl
-      const meta = await graphGet('/shares/'+cfg.sharingToken+
-        '/driveItem?$select=id,name,parentReference,@microsoft.graph.downloadUrl,@content.downloadUrl', 12000);
-      const dlUrl = meta['@microsoft.graph.downloadUrl']
-                 || meta['@content.downloadUrl'];
+      const res = await _fetchTimeout(
+        'https://graph.microsoft.com/v1.0/shares/'+sToken+'/driveItem/content',
+        {headers:{Authorization:'Bearer '+tok}, redirect:'follow'}, 30000);
+      if(res.ok){
+        const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
+        console.log('[KST] ✅ ShareToken/SheetJS OK:', sheet, rows.length, 'rows');
+        return rows;
+      }
+      errors.push('Content: '+res.status);
+    }catch(e){ errors.push('Content: '+e.message); console.warn('[KST] Strategy3 failed:', e.message); }
 
+    /* ─ Strategy 4: @microsoft.graph.downloadUrl ─ */
+    try{
+      const meta = await graphGet('/shares/'+sToken+
+        '/driveItem?$select=id,parentReference,@microsoft.graph.downloadUrl', 12000);
+      const dlUrl = meta['@microsoft.graph.downloadUrl'];
       if(dlUrl){
         const res = await _fetchTimeout(dlUrl, {}, 30000);
-        if(!res.ok) throw new Error('dlUrl '+res.status);
-        const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
-        console.log('[KST] ✅ downloadUrl/SheetJS OK:', sheet, rows.length, 'rows');
-        return rows;
-      } else {
-        // Step B: ถ้าไม่มี downloadUrl → ลอง /content direct
-        const driveId = meta.parentReference?.driveId;
-        const itemId  = meta.id;
-        if(driveId && itemId){
-          const res2 = await _fetchTimeout(
-            'https://graph.microsoft.com/v1.0/drives/'+driveId+'/items/'+itemId+'/content',
-            {headers:{Authorization:'Bearer '+tok}, redirect:'follow'}, 30000);
-          if(res2.ok){
-            const rows = await _xlsxToRows(await res2.arrayBuffer(), sheet);
-            console.log('[KST] ✅ /content SheetJS OK:', sheet, rows.length, 'rows');
-            return rows;
-          }
+        if(res.ok){
+          const rows = await _xlsxToRows(await res.arrayBuffer(), sheet);
+          console.log('[KST] ✅ downloadUrl/SheetJS OK:', sheet, rows.length, 'rows');
+          return rows;
         }
-        throw new Error('no downloadUrl available');
       }
-    }catch(e){
-      errors.push('SheetJS: '+e.message);
-      console.warn('[KST] SheetJS failed:', e.message);
-    }
+      // fallback: /content via resolved driveId
+      const dId = meta.parentReference?.driveId, iId = meta.id;
+      if(dId && iId){
+        const res2 = await _fetchTimeout(
+          'https://graph.microsoft.com/v1.0/drives/'+dId+'/items/'+iId+'/content',
+          {headers:{Authorization:'Bearer '+tok}, redirect:'follow'}, 30000);
+        if(res2.ok){
+          const rows = await _xlsxToRows(await res2.arrayBuffer(), sheet);
+          console.log('[KST] ✅ resolved-content/SheetJS OK:', sheet, rows.length, 'rows');
+          return rows;
+        }
+      }
+    }catch(e){ errors.push('dlUrl: '+e.message); }
   }
 
   throw new Error('ทุก method ล้มเหลว: '+errors.join(' | '));
