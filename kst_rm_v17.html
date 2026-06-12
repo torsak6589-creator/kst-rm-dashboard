@@ -119,6 +119,39 @@ select:hover,input[type=date]:hover{border-color:var(--gold)}
 .btn-refresh{background:rgba(0,200,151,.1);color:var(--green);
   border:1px solid rgba(0,200,151,.3);border-radius:5px;padding:4px 10px;
   font-size:10px;font-family:inherit;cursor:pointer}
+.btn-check{background:rgba(0,188,212,.1);color:#00BCD4;position:relative;
+  border:1px solid rgba(0,188,212,.3);border-radius:5px;padding:4px 10px;
+  font-size:10px;font-family:inherit;cursor:pointer}
+.dq-badge{position:absolute;top:-7px;right:-7px;min-width:15px;height:15px;
+  border-radius:8px;font-size:9px;font-weight:700;line-height:15px;text-align:center;
+  padding:0 3px;color:#fff;display:none}
+.dq-badge.err{background:#E53935;display:inline-block}
+.dq-badge.warn{background:#C8982A;display:inline-block}
+.dq-badge.ok{background:#00C897;display:inline-block}
+#dqOverlay{position:fixed;inset:0;z-index:998;display:none;
+  background:rgba(5,12,24,.72);backdrop-filter:blur(3px);
+  align-items:flex-start;justify-content:center;padding:40px 14px}
+#dqOverlay.show{display:flex}
+.dq-modal{background:var(--navy3,#0D1B2E);border:1px solid var(--border);
+  border-radius:10px;max-width:760px;width:100%;max-height:84vh;overflow-y:auto;
+  box-shadow:0 18px 60px rgba(0,0,0,.5);padding:18px 20px;color:var(--text)}
+.dq-modal h3{margin:0 0 4px;font-size:14px;color:var(--gold,#C8982A)}
+.dq-sub{font-size:10px;color:var(--muted);margin-bottom:12px}
+.dq-sec{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:9px}
+.dq-sec.err{border-color:rgba(229,57,53,.45)}
+.dq-sec.warn{border-color:rgba(200,152,42,.45)}
+.dq-sec.ok{border-color:rgba(0,200,151,.35)}
+.dq-sec-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600}
+.dq-sec-h .cnt{margin-left:auto;font-size:10px;color:var(--muted);font-weight:400}
+.dq-items{margin:7px 0 0;padding:0;list-style:none;font-size:11px;line-height:1.7}
+.dq-items li{padding-left:16px;position:relative}
+.dq-items li::before{content:"•";position:absolute;left:4px}
+.dq-items li.e{color:#FF7B72}
+.dq-items li.w{color:#E8C36A}
+.dq-items li.i{color:var(--muted)}
+.dq-rows{color:var(--muted);font-size:10px}
+.dq-close{float:right;background:none;border:1px solid var(--border);color:var(--muted);
+  border-radius:5px;padding:3px 10px;font-size:11px;font-family:inherit;cursor:pointer}
 .fstatus{margin-left:auto;font-size:9px;color:var(--muted)}
 #loadBar{height:2px;background:linear-gradient(90deg,#C8982A,#00BCD4);width:0;
   transition:width .3s;position:sticky;top:140px;z-index:7}
@@ -283,6 +316,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <button class="btn-primary" onclick="applyFilter()" aria-label="กรองข้อมูล">🔍 Apply</button>
   <button class="btn-sec" onclick="resetFilter()" aria-label="รีเซ็ตตัวกรอง">↺ Reset</button>
   <button class="btn-refresh" onclick="refreshAll()" aria-label="รีเฟรชข้อมูลจาก OneDrive">🔄 Refresh</button>
+  <button class="btn-check" id="dqBtn" onclick="openDQ()" aria-label="ตรวจสอบความถูกต้องของข้อมูลที่ upload">🧪 ตรวจสอบข้อมูล<span class="dq-badge" id="dqBadge"></span></button>
   <button id="snapFallbackBtn" onclick="forceSnapshot()" style="display:none;
     background:rgba(255,184,0,.15);color:var(--amber);border:1px solid rgba(255,184,0,.4);
     border-radius:5px;padding:4px 10px;font-size:10px;font-family:inherit;cursor:pointer">
@@ -483,6 +517,16 @@ tr:hover td{background:rgba(200,152,42,.03)}
       </tr></thead>
       <tbody id="rcBody"></tbody>
     </table></div>
+  </div>
+</div>
+
+<!-- DATA QUALITY CHECK MODAL -->
+<div id="dqOverlay" onclick="if(event.target===this)closeDQ()">
+  <div class="dq-modal">
+    <button class="dq-close" onclick="closeDQ()">✕ ปิด</button>
+    <h3>🧪 ผลตรวจสอบความถูกต้องของข้อมูล (หลัง Upload)</h3>
+    <div class="dq-sub" id="dqSub">—</div>
+    <div id="dqBody">ยังไม่มีผลตรวจ — กด Refresh เพื่อ sync และตรวจสอบ</div>
   </div>
 </div>
 
@@ -827,6 +871,7 @@ async function loadAll(){
      ถ้าสำเร็จ → update live, ถ้าไม่ → snapshot ยังอยู่
   ══════════════════════════════════════ */
   setLB(10);
+  _dqRaw={};
   try{
     // ── RM RECORD ──
     setLB(20);
@@ -838,6 +883,7 @@ async function loadAll(){
         rows = await fetchSheet(CFG1, CFG1.sheetAlt);
       } else { throw e1; }
     }
+    _dqRaw.rm = rows;
     if(rows && rows.length > 1){
       _detectCols(rows[0]);
       const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
@@ -851,6 +897,7 @@ async function loadAll(){
     setLB(55);
     try{
       const pRows = await fetchSheet(CFG2, CFG2.sheetPlan);
+      _dqRaw.plan = pRows;
       if(pRows && pRows.length > 2){
         const newPlan=[];
         for(let i=2;i<pRows.length;i++){
@@ -866,12 +913,13 @@ async function loadAll(){
         }
         if(newPlan.length>0) planData=newPlan;
       }
-    }catch(e){ console.warn('[KST] PLAN_DAILY fallback:', e.message); }
+    }catch(e){ _dqRaw.planErr=e.message; console.warn('[KST] PLAN_DAILY fallback:', e.message); }
 
     // ── ACTUAL_TRACKING ──
     setLB(78);
     try{
       const aRows = await fetchSheet(CFG2, CFG2.sheetActual);
+      _dqRaw.actual = aRows;
       const MONTHS=['January','February','march','March','April','May','June','July','August','September','October','November','December'];
       const MO={'January':'มกราคม','February':'กุมภาพันธ์','march':'มีนาคม','March':'มีนาคม','April':'เมษายน','May':'พฤษภาคม','June':'มิถุนายน','July':'กรกฎาคม','August':'สิงหาคม','September':'กันยายน','October':'ตุลาคม','November':'พฤศจิกายน','December':'ธันวาคม'};
       const newA=[];
@@ -892,7 +940,7 @@ async function loadAll(){
           actualData=newA;
           console.log('[KST] ✅ Live ACTUAL_TRACKING:',newA.length,'records, YTD',newA.reduce((s,x)=>s+(x.actVol||0),0).toLocaleString());
         }
-    }catch(e){ console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
+    }catch(e){ _dqRaw.actualErr=e.message; console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
 
     // ── ราคา RM คิดขาย ──
     setLB(85);
@@ -903,6 +951,7 @@ async function loadAll(){
         sharingToken: CFG2.tokenPrice || CFG2.sharingToken,
       };
       const prRows = await fetchSheet(priceCFG, CFG2.sheetPrice);
+      _dqRaw.price = prRows;
       if(prRows && prRows.length > 8){
         const newPrice = [];
         const hdr = prRows[8]; // header row
@@ -943,7 +992,7 @@ async function loadAll(){
           _renderTab4(); // refresh Tab4 with live data
         }
       }
-    }catch(e){ console.warn('[KST] ราคา RM fallback:', e.message); }
+    }catch(e){ _dqRaw.priceErr=e.message; console.warn('[KST] ราคา RM fallback:', e.message); }
 
     // ── RM-RECIVE ──
     setLB(90);
@@ -953,6 +1002,7 @@ async function loadAll(){
         fileId:  CFG2.fileId,
         sharingToken: CFG2.sharingToken,
       }, CFG2.sheetReceive);
+      _dqRaw.receive = rcRows;
       if(rcRows && rcRows.length > 3){
         const newRc=[];
         for(let i=3;i<rcRows.length;i++){
@@ -981,7 +1031,7 @@ async function loadAll(){
           _renderTab5();
         }
       }
-    }catch(e){ console.warn('[KST] RM-RECIVE fallback:', e.message); }
+    }catch(e){ _dqRaw.receiveErr=e.message; console.warn('[KST] RM-RECIVE fallback:', e.message); }
 
     // ── Update date range ──
     setLB(90);
@@ -1000,8 +1050,11 @@ async function loadAll(){
     setFS('✅ Live — RM: '+rawRM.length.toLocaleString()+' | แผน: '+planData.length+' | KPI: '+actualData.length+' | '+_ts());
     document.getElementById('footerTs').textContent='อัปเดต: '+_ts();
     setLB(0);
+    _dqRun();
 
   }catch(e){
+    _dqRaw.rmErr=_dqRaw.rmErr||e.message;
+    _dqRun();
     console.warn('[KST] OneDrive sync failed:', e.message);
     /* Snapshot ยังแสดงอยู่ — แค่ update status */
     document.getElementById('snapBadge').style.display='inline';
@@ -1094,6 +1147,183 @@ function resetFilter(){
   document.getElementById('fType').value='all';document.getElementById('fSpecies').value='all';applyFilter();
 }
 async function refreshAll(){await loadAll();}
+
+/* ══════ DATA QUALITY CHECK — ตรวจสอบความถูกต้องของข้อมูลหลัง upload ══════
+   ตรวจ raw rows ที่ดึงจากไฟล์ Excel บน SharePoint (หลัง user upload)
+   เทียบกับเงื่อนไขที่ dashboard ใช้กรองจริงใน loadAll
+   เลขแถว = ลำดับแถวใน used range ของชีต (แถวแรกของข้อมูล = 1) */
+let _dqRaw={};
+let _dqReport=null;
+
+function _dqRowList(arr,max){
+  const m=max||8;
+  const s=arr.slice(0,m).join(', ');
+  return arr.length>m ? s+' …และอีก '+(arr.length-m)+' แถว' : s;
+}
+
+function _dqCheckRM(rep){
+  const sec={name:'RM RECORD (ตารางรับซื้อ)',issues:[],summary:''};rep.push(sec);
+  if(_dqRaw.rmErr&&!_dqRaw.rm){sec.issues.push({s:'e',t:'โหลด sheet ไม่สำเร็จ: '+_dqRaw.rmErr+' — dashboard ใช้ snapshot แทน'});return;}
+  const rows=_dqRaw.rm;
+  if(!rows||rows.length<2){sec.issues.push({s:'e',t:'ไม่พบข้อมูล (ได้ '+(rows?rows.length:0)+' แถว)'});return;}
+  const reqCols={date:'วันที่',supplier:'ชื่อเปิดบิล',weight:'ปริมาณ (kg)',size:'ขนาดตัว',typeRM:'ประเภท RM',price:'ราคา'};
+  for(const k in reqCols){
+    if(COL[k]<0)sec.issues.push({s:'e',t:'หาคอลัมน์ "'+reqCols[k]+'" ใน header ไม่เจอ — ข้อมูลส่วนนี้จะหายจาก dashboard'});
+  }
+  const today=_fmt(new Date());
+  const bad={date:[],future:[],old:[],weight:[],supplier:[],price:[],dup:[]};
+  const seen={};let blank=0,excl=0,valid=0;
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i],x=i+1;
+    if(!r||r.every(c=>c===null||String(c).trim()==='')){blank++;continue;}
+    const p=_parseRM(r);
+    if(_excl(p.typeRM)){excl++;continue;}
+    if(!p.date){bad.date.push(x);continue;}
+    if(p.weight<=0){bad.weight.push(x);continue;}
+    if(p.date>today)bad.future.push(x);
+    if(p.date<'2020-01-01')bad.old.push(x);
+    if(!p.supplier)bad.supplier.push(x);
+    if(p.price<=0)bad.price.push(x);
+    const key=p.date+'|'+p.supplier+'|'+p.weight+'|'+p.size+'|'+p.price;
+    if(seen[key])bad.dup.push(x);else seen[key]=x;
+    valid++;
+  }
+  sec.summary='ทั้งหมด '+(rows.length-1).toLocaleString()+' แถว → ใช้ได้ '+valid.toLocaleString()+' | ยกเลิก/หยุด '+excl+' | แถวว่าง '+blank;
+  if(bad.date.length)sec.issues.push({s:'e',t:'วันที่ว่าง/อ่านไม่ได้ '+bad.date.length+' แถว — ถูกตัดทิ้งจาก dashboard',rows:bad.date});
+  if(bad.weight.length)sec.issues.push({s:'w',t:'ปริมาณ ≤ 0 หรือว่าง '+bad.weight.length+' แถว — ถูกตัดทิ้ง',rows:bad.weight});
+  if(bad.future.length)sec.issues.push({s:'w',t:'วันที่เป็นอนาคต '+bad.future.length+' แถว — เช็คว่าคีย์ปี/เดือนผิดหรือไม่',rows:bad.future});
+  if(bad.old.length)sec.issues.push({s:'w',t:'วันที่เก่ากว่าปี 2020 '+bad.old.length+' แถว',rows:bad.old});
+  if(bad.supplier.length)sec.issues.push({s:'w',t:'ไม่มีชื่อเปิดบิล '+bad.supplier.length+' แถว',rows:bad.supplier});
+  if(bad.dup.length)sec.issues.push({s:'w',t:'แถวซ้ำ (วันที่+ชื่อ+ปริมาณ+ขนาด+ราคา เหมือนกัน) '+bad.dup.length+' แถว — อาจคีย์ซ้ำ',rows:bad.dup});
+  if(bad.price.length)sec.issues.push({s:'i',t:'ราคา ≤ 0 หรือว่าง '+bad.price.length+' แถว — นับปริมาณได้แต่มูลค่า = 0',rows:bad.price});
+}
+
+function _dqCheckPlan(rep){
+  const sec={name:'PLAN_DAILY (แผนรับซื้อรายวัน)',issues:[],summary:''};rep.push(sec);
+  if(_dqRaw.planErr){sec.issues.push({s:'e',t:'โหลดไม่สำเร็จ: '+_dqRaw.planErr+' — ใช้ข้อมูลเดิมแทน'});return;}
+  const rows=_dqRaw.plan;
+  if(!rows||rows.length<=2){sec.issues.push({s:'w',t:'ไม่มีข้อมูล (ได้ '+(rows?rows.length:0)+' แถว — ข้อมูลต้องเริ่มแถว 3)'});return;}
+  const badD=[],zeroW=[];let valid=0,excl=0,blank=0;
+  for(let i=2;i<rows.length;i++){
+    const r=rows[i],x=i+1;
+    if(!r||!r[0]){blank++;continue;}
+    let d=r[0];
+    if(typeof d==='number'&&d>40000)d=new Date(Math.round((d-25569)*86400000));
+    else d=new Date(d);
+    if(isNaN(d)){badD.push(x);continue;}
+    const w=_n(r[2]),t=String(r[4]||'').trim().replace(/กุุ้ง/g,'กุ้ง');
+    if(_excl(t)){excl++;continue;}
+    if(w<=0){zeroW.push(x);continue;}
+    valid++;
+  }
+  sec.summary='ใช้ได้ '+valid+' แถว | ยกเลิก/วันหยุด '+excl+' | ไม่มีวันที่ '+blank;
+  if(badD.length)sec.issues.push({s:'e',t:'วันที่อ่านไม่ได้ '+badD.length+' แถว — ถูกตัดทิ้ง',rows:badD});
+  if(zeroW.length)sec.issues.push({s:'i',t:'แผน = 0 จำนวน '+zeroW.length+' แถว (ข้าม)',rows:zeroW});
+}
+
+function _dqCheckActual(rep){
+  const sec={name:'ACTUAL_TRACKING (KPI รายเดือน)',issues:[],summary:''};rep.push(sec);
+  if(_dqRaw.actualErr){sec.issues.push({s:'e',t:'โหลดไม่สำเร็จ: '+_dqRaw.actualErr+' — ใช้ข้อมูลเดิมแทน'});return;}
+  const rows=_dqRaw.actual;
+  if(!rows||!rows.length){sec.issues.push({s:'w',t:'ไม่มีข้อมูล'});return;}
+  const MONTHS=['January','February','march','March','April','May','June','July','August','September','October','November','December'];
+  let ok=0,otherYr=0;const over=[];
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r||!r[0])continue;
+    if(!MONTHS.includes(String(r[0]).trim()))continue;
+    if(!String(r[1]||'').includes('กุ้ง'))continue;
+    if((Number(r[8])||0)!==2026){otherYr++;continue;}
+    ok++;
+    const pv=parseFloat(r[2])||0,av=parseFloat(r[3])||0;
+    if(pv>0&&av>pv*3)over.push(i+1);
+  }
+  sec.summary='ปี 2026: '+ok+' รายการ | ปีอื่น '+otherYr;
+  if(!ok)sec.issues.push({s:'w',t:'ไม่พบรายการปี 2026 — เช็คคอลัมน์ปี (คอลัมน์ที่ 9) ในไฟล์'});
+  if(over.length)sec.issues.push({s:'w',t:'Actual สูงกว่าแผนเกิน 3 เท่า '+over.length+' แถว — เช็คหน่วย/ตัวเลข',rows:over});
+}
+
+function _dqCheckPrice(rep){
+  const sec={name:'ราคา RM คิดขาย',issues:[],summary:''};rep.push(sec);
+  if(_dqRaw.priceErr){sec.issues.push({s:'e',t:'โหลดไม่สำเร็จ: '+_dqRaw.priceErr+' — ใช้ข้อมูลเดิมแทน'});return;}
+  const rows=_dqRaw.price;
+  if(!rows||rows.length<=9){sec.issues.push({s:'w',t:'ไม่มีข้อมูล (ข้อมูลต้องเริ่มแถว 10 ของชีต)'});return;}
+  const MONTHS_TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const sn2=v=>{const x=parseFloat(String(v||'').replace(/,/g,''));return isNaN(x)?0:x;};
+  let ok=0;const noKey=[],zero=[],months=new Set();
+  for(let i=9;i<rows.length;i++){
+    const r=rows[i],x=i+1;if(!r||!r[0])continue;
+    if(parseFloat(r[0])!==2026)continue;
+    const month=String(r[2]||'').trim(),size=String(r[5]||'').trim();
+    if(!MONTHS_TH.includes(month)||!size){noKey.push(x);continue;}
+    if(sn2(r[6])+sn2(r[7])+sn2(r[8])+sn2(r[9])<=0){zero.push(x);continue;}
+    ok++;months.add(month);
+  }
+  sec.summary='ปี 2026: '+ok+' แถว ครอบคลุม '+months.size+' เดือน';
+  if(!ok)sec.issues.push({s:'w',t:'ไม่พบราคาปี 2026 ที่ใช้ได้'});
+  if(noKey.length)sec.issues.push({s:'w',t:'เดือน/ขนาด ว่างหรือสะกดไม่ตรง '+noKey.length+' แถว — ถูกตัดทิ้ง',rows:noKey});
+  if(zero.length)sec.issues.push({s:'i',t:'ราคาทุกช่องเป็น 0/ว่าง '+zero.length+' แถว (ข้าม)',rows:zero});
+}
+
+function _dqCheckReceive(rep){
+  const sec={name:'RM-RECIVE (รับเข้าโรงงาน)',issues:[],summary:''};rep.push(sec);
+  if(_dqRaw.receiveErr){sec.issues.push({s:'e',t:'โหลดไม่สำเร็จ: '+_dqRaw.receiveErr+' — ใช้ข้อมูลเดิมแทน'});return;}
+  const rows=_dqRaw.receive;
+  if(!rows||rows.length<=3){sec.issues.push({s:'w',t:'ไม่มีข้อมูล (ข้อมูลต้องเริ่มแถว 4)'});return;}
+  let ok=0,otherYr=0;const badD=[],noFc=[],badNum=[];
+  for(let i=3;i<rows.length;i++){
+    const r=rows[i],x=i+1;if(!r||!r[0])continue;
+    if(parseFloat(r[5])!==2026){otherYr++;continue;}
+    let dt=r[1];
+    if(typeof dt==='number'&&dt>40000)dt=new Date(Math.round((dt-25569)*86400000));
+    else dt=new Date(dt);
+    if(isNaN(dt)){badD.push(x);continue;}
+    if(!String(r[2]||'').trim()){noFc.push(x);continue;}
+    if((parseFloat(r[7])||0)<=0||(parseFloat(r[9])||0)<=0){badNum.push(x);continue;}
+    ok++;
+  }
+  sec.summary='ปี 2026: ใช้ได้ '+ok+' แถว | ปีอื่น '+otherYr;
+  if(badD.length)sec.issues.push({s:'e',t:'วันที่กุ้งเข้าอ่านไม่ได้ '+badD.length+' แถว — ถูกตัดทิ้ง',rows:badD});
+  if(noFc.length)sec.issues.push({s:'w',t:'ไม่มี Farm code '+noFc.length+' แถว — ถูกตัดทิ้ง',rows:noFc});
+  if(badNum.length)sec.issues.push({s:'w',t:'ขนาดตัว/น้ำหนัก ≤ 0 จำนวน '+badNum.length+' แถว — ถูกตัดทิ้ง',rows:badNum});
+}
+
+function _dqRun(){
+  try{
+    const rep=[];
+    _dqCheckRM(rep);_dqCheckPlan(rep);_dqCheckActual(rep);_dqCheckPrice(rep);_dqCheckReceive(rep);
+    _dqReport={ts:new Date(),secs:rep};
+    const errs=rep.reduce((s,x)=>s+x.issues.filter(i=>i.s==='e').length,0);
+    const warns=rep.reduce((s,x)=>s+x.issues.filter(i=>i.s==='w').length,0);
+    const b=document.getElementById('dqBadge');
+    if(errs){b.className='dq-badge err';b.textContent=errs;}
+    else if(warns){b.className='dq-badge warn';b.textContent=warns;}
+    else{b.className='dq-badge ok';b.textContent='✓';}
+  }catch(e){console.warn('[KST] DQ check error:',e);}
+}
+
+function openDQ(){
+  const ov=document.getElementById('dqOverlay');
+  const body=document.getElementById('dqBody');
+  if(!_dqReport&&Object.keys(_dqRaw).length)_dqRun();
+  if(!_dqReport){
+    document.getElementById('dqSub').textContent='ยังไม่ได้ sync ข้อมูล live';
+    body.innerHTML='ยังไม่มีผลตรวจ — ต้อง Sign in แล้วกด 🔄 Refresh เพื่อดึงไฟล์ที่ upload จาก SharePoint ก่อน';
+    ov.classList.add('show');return;
+  }
+  document.getElementById('dqSub').textContent='ตรวจเมื่อ '+_dqReport.ts.toLocaleString('th-TH')
+    +' — เทียบกับไฟล์ Excel ล่าสุดบน SharePoint (เลขแถวนับจากแถวแรกของข้อมูลในชีต)';
+  body.innerHTML=_dqReport.secs.map(sec=>{
+    const e=sec.issues.filter(i=>i.s==='e').length,w=sec.issues.filter(i=>i.s==='w').length;
+    const cls=e?'err':(w?'warn':'ok'),icon=e?'❌':(w?'⚠️':'✅');
+    const items=sec.issues.map(it=>'<li class="'+it.s+'">'+it.t
+      +(it.rows&&it.rows.length?' <span class="dq-rows">[แถวที่ '+_dqRowList(it.rows)+']</span>':'')+'</li>').join('');
+    return '<div class="dq-sec '+cls+'"><div class="dq-sec-h">'+icon+' '+sec.name
+      +'<span class="cnt">'+(sec.summary||'')+'</span></div>'
+      +'<ul class="dq-items">'+(items||'<li class="i">ไม่พบปัญหา ✓</li>')+'</ul></div>';
+  }).join('');
+  ov.classList.add('show');
+}
+function closeDQ(){document.getElementById('dqOverlay').classList.remove('show');}
 
 /* ══════ TAB 1 RENDER ══════ */
 function _renderTab1(){
