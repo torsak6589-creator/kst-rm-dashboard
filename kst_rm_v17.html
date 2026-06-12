@@ -512,7 +512,7 @@ const CFG2 = {
   sheetReceive: 'RM-RECIVE',
 };
 const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_v17.html';
-const SCOPES = 'Files.Read User.Read offline_access';
+const SCOPES = 'Files.Read Files.Read.All User.Read offline_access';
 const TENANT = '1a4d139b-4e96-4d3b-8cfd-007453cc609e';
 const CLIENT = '2459a57b-bd24-4c19-8f82-1b1d607bd11a';
 
@@ -1652,7 +1652,7 @@ if ('serviceWorker' in navigator) {
     try {
       // Clear old caches first
       const keys = await caches.keys();
-      await Promise.all(keys.filter(k => k !== 'kst-rm-v17').map(k => caches.delete(k)));
+      await Promise.all(keys.filter(k => k !== 'kst-rm-v17b').map(k => caches.delete(k)));
       const reg = await navigator.serviceWorker.register('./sw.js');
       console.log('[KST] SW registered v13:', reg.scope);
     } catch(err) {
