@@ -494,7 +494,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
 </div>
 
 <script>
-console.log('%c[KST] BUILD v17.2-guid-appsheet (12/06/2026)', 'color:#C8982A;font-weight:bold');
+console.log('%c[KST] BUILD v17.4-tzfix2 (12/06/2026)', 'color:#C8982A;font-weight:bold');
 /* ══════ CONFIG ══════ */
 const CFG1 = {
   /* ไฟล์จริงที่ AppSheet เขียน — sourcedoc GUID 28D0D235 (ยืนยันจาก AppSheet) */
@@ -605,19 +605,33 @@ async function graphGet(path, ms=15000){
 
 /* แปลง xlsx ArrayBuffer → rows (array of arrays) format เดียวกับ Workbook API */
 function _xlsxToRows(buffer, sheetName){
-  const wb = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true });
+  /* ไม่ใช้ cellDates — อ่าน Excel serial ตรงๆ แล้วคำนวณวันแบบ UTC ล้วน
+     กันบั๊ก timezone (UTC+7 ทำให้วันเลื่อน -1) */
+  const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
   const ws = wb.Sheets[sheetName] || wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error('sheet "' + sheetName + '" not found');
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-  /* date → "YYYY-MM-DD" string ให้ตรง format เดิม */
-  return rows.map(r => r.map(c => {
-    if (c instanceof Date && !isNaN(c)) {
-      return c.getFullYear() + '-' +
-             String(c.getMonth() + 1).padStart(2, '0') + '-' +
-             String(c.getDate()).padStart(2, '0');
-    }
-    return c;
-  }));
+
+  function serialToYMD(n){
+    /* 25569 = จำนวนวันจาก 1899-12-30 ถึง 1970-01-01 */
+    const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+    return d.getUTCFullYear() + '-' +
+           String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getUTCDate()).padStart(2, '0');
+  }
+  function dateToYMD(d){
+    return d.getUTCFullYear() + '-' +
+           String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  return rows.map(r => {
+    const out = r.slice();
+    const v = out[0]; /* คอลัมน์แรก = วันที่ */
+    if (typeof v === 'number' && v > 20000 && v < 80000) out[0] = serialToYMD(v);
+    else if (v instanceof Date && !isNaN(v)) out[0] = dateToYMD(v);
+    return out;
+  });
 }
 
 /* fetch พร้อม timeout — helper ที่ Strategy 3 ต้องใช้ */
@@ -749,8 +763,18 @@ const _g=(r,c)=>c>=0&&c<r.length?r[c]:'';
 const _n=v=>{const x=parseFloat(String(v||'').replace(/,/g,''));return isNaN(x)?0:x;};
 function _parseRM(r){
   let rawD=_g(r,COL.date),d=null;
-  if(rawD){if(typeof rawD==='number')d=new Date(Math.round((rawD-25569)*86400000));else d=new Date(rawD);
-    if(isNaN(d))d=null;else{const y=d.getFullYear(),mo=d.getMonth()+1,dy=d.getDate();d=y+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');}}
+  if(rawD){
+    /* serial หรือ string ที่เป็น YYYY-MM-DD อยู่แล้ว (จาก _xlsxToRows) */
+    if(typeof rawD==='string' && /^\d{4}-\d{2}-\d{2}/.test(rawD)){
+      d=rawD.slice(0,10);
+    } else if(typeof rawD==='number'){
+      const dt=new Date(Math.round((rawD-25569)*86400000)); /* UTC ms */
+      d=isNaN(dt)?null:(dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0'));
+    } else {
+      const dt=new Date(rawD);
+      d=isNaN(dt)?null:(dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0'));
+    }
+  }
   const w=_n(_g(r,COL.weight)),p=_n(_g(r,COL.price));
   return{date:d,supplier:String(_g(r,COL.supplier)||'').trim(),weight:w,price:p,
     size:_n(_g(r,COL.size)),typeRM:_normalizeType(String(_g(r,COL.typeRM)||'')),
@@ -812,7 +836,7 @@ async function loadAll(){
           if(typeof d==='number'&&d>40000) d=new Date(Math.round((d-25569)*86400000));
           else d=new Date(d);
           if(isNaN(d))continue;
-          const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const ds=d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
           const w=_n(r[2]),t=String(r[4]||'').trim().replace(/กุุ้ง/g,'กุ้ง');
           if(w<=0||_excl(t))continue;
           newPlan.push([ds,String(r[1]||'').trim(),w,_n(r[3]),t,_n(r[5]),String(r[8]||'').trim()]);
@@ -917,7 +941,7 @@ async function loadAll(){
           if(typeof dt==='number'&&dt>40000) dt=new Date(Math.round((dt-25569)*86400000));
           else dt=new Date(dt);
           if(isNaN(dt))continue;
-          const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
           const fc=String(r[2]||'').trim();
           const sz=parseFloat(r[7])||0;
           const wt=parseFloat(r[9])||0;
