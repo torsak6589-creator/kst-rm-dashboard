@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIktTVCBQcm9jdXJlbWVudCBEYXNoYm9hcmQiLCAic2hvcnRfbmFtZSI6ICJLU1QgUk0iLCAic3RhcnRfdXJsIjogIi9rc3Qtcm0tZGFzaGJvYXJkL2tzdF9ybV92MTcuaHRtbCIsICJzY29wZSI6ICIva3N0LXJtLWRhc2hib2FyZC8iLCAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwgImJhY2tncm91bmRfY29sb3IiOiAiIzBBMEUxQSIsICJ0aGVtZV9jb2xvciI6ICIjQzg5ODJBIiwgImljb25zIjogW3sic3JjIjogIi9rc3Qtcm0tZGFzaGJvYXJkL2ljb24tMTkyLnBuZyIsICJzaXplcyI6ICIxOTJ4MTkyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn0sIHsic3JjIjogIi9rc3Qtcm0tZGFzaGJvYXJkL2ljb24tMTkyLnBuZyIsICJzaXplcyI6ICI1MTJ4NTEyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn1dfQ==">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KST RM">
@@ -1727,7 +1727,7 @@ if ('serviceWorker' in navigator) {
       // Clear old caches first
       const keys = await caches.keys();
       await Promise.all(keys.filter(k => k !== 'kst-rm-v17').map(k => caches.delete(k)));
-      const reg = await navigator.serviceWorker.register('./sw.js');
+      const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       console.log('[KST] SW registered v13:', reg.scope);
     } catch(err) {
       console.warn('[KST] SW error:', err);
