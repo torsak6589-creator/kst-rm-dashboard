@@ -2,7 +2,6 @@ const CACHE_NAME = 'kst-rm-v17';
 const STATIC_ASSETS = [
   './kst_rm_v17.html',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
 ];
 
 self.addEventListener('install', e => {
@@ -18,7 +17,7 @@ self.addEventListener('activate', e => {
     caches.keys()
       .then(keys => Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => {
-          console.log('[KST SW v16] Deleting old cache:', k);
+          console.log('[KST SW v17] Deleting old cache:', k);
           return caches.delete(k);
         })
       ))
