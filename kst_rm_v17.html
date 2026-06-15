@@ -481,7 +481,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <div class="tab-pane" id="t5">
   <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="kpi cg"><div class="kpi-lbl">📊 ราคาเฉลี่ยถ่วงน้ำหนัก</div><div class="kpi-val" id="rc-avgprice">—</div><div class="kpi-sub">฿/กก. (เดือนที่เลือก)</div></div>
-    <div class="kpi cc"><div class="kpi-lbl">📋 ราคาคาดการณ์</div><div class="kpi-val" id="rc-forecast">—</div><div class="kpi-sub">฿/กก. (size ใกล้เคียง)</div></div>
+    <div class="kpi cc"><div class="kpi-lbl">📋 ราคาคาดการณ์</div><div class="kpi-val" id="rc-forecast">—</div><div class="kpi-sub">฿/กก. (ถ่วงน้ำหนัก)</div></div>
     <div class="kpi" id="rc-diff-card"><div class="kpi-lbl">📈 ต่างจากคาดการณ์</div><div class="kpi-val" id="rc-diff">—</div><div class="kpi-sub" id="rc-diff-sub">฿/กก.</div></div>
     <div class="kpi ca"><div class="kpi-lbl">📅 เดือนที่เลือก</div><div class="kpi-val" id="rc-lastdate" style="font-size:16px">—</div><div class="kpi-sub" id="rc-farmcount">—</div></div>
   </div>
@@ -1416,7 +1416,7 @@ function _supTable(){
   const sorted=Object.entries(m).sort((a,b)=>b[1].vol-a[1].vol);
   const tot=sorted.reduce((s,[,v])=>s+v.vol,0),maxV=sorted[0]?.[1]?.vol||1;
   document.getElementById('supBody').innerHTML=sorted.slice(0,20).map(([name,d],i)=>{
-    const rk=i+1,pct=(tot?(d.vol/tot*100).toFixed(1):'0'),avgP=(d.p.length?d.p.reduce((a,b)=>a+b,0)/d.p.length:0);
+    const rk=i+1,pct=(tot?(d.vol/tot*100).toFixed(1):'0'),avgP=(d.vol?d.val/d.vol:0);  // ราคาเฉลี่ยถ่วงน้ำหนัก = Σ(ราคา×น้ำหนัก)/Σ(น้ำหนัก)
     const bw=Math.min(Math.round(d.vol/maxV*80),80),mt=[...d.ty].find(t=>t.includes('เป็น'))||[...d.ty][0]||'—';
     const tc=mt.includes('เป็น')?'tg':'tb';
     return `<tr><td><b>${rk}<\/b><\/td><td title="${name}">${name.length>20?name.slice(0,19)+'…':name}<\/td><td><span class="tag ${tc}">${mt}<\/span><\/td><td>${d.vol.toLocaleString()}<\/td><td><div style="display:flex;align-items:center;gap:5px"><div style="width:${bw}px;height:4px;border-radius:2px;background:linear-gradient(90deg,#C8982A,#E5B84A)"><\/div>${pct}%<\/div><\/td><td>${avgP?'฿ '+avgP.toFixed(0):'—'}<\/td><td>${_fM(d.val)}<\/td><td>${d.n}<\/td><\/tr>`;
@@ -1713,20 +1713,29 @@ function _renderTab5(){
   const latest  = data[0]?.[0]?.slice(0,7) || '';
   const kpiMon  = (selMon!=='all') ? selMon : latest;
   const kpiData = filt.filter(r=>r[0].startsWith(kpiMon));
+  // ราคาเฉลี่ยถ่วงน้ำหนัก (ซื้อจริง) = Σ(ราคา×น้ำหนัก) / Σ(น้ำหนัก)
   const totalW  = kpiData.reduce((s,r)=>s+r[3],0);
   const totalWP = kpiData.reduce((s,r)=>s+(r[3]*r[4]),0);
   const avgP    = totalW>0 ? Math.round(totalWP/totalW*10)/10 : 0;
-  const fc      = _getForecastPrice(60, selSp==='all'?'กุ้งขาว':selSp, 'กุ้ง Broker', kpiMon);
-  const diff    = fc ? Math.round((avgP-fc.price)*10)/10 : 0;
-  const farms   = new Set(kpiData.map(r=>r[1])).size;
+  // ราคาคาดการณ์ถ่วงน้ำหนัก = เทียบคาดการณ์ตาม size/ชนิด/ประเภท ของแต่ละแถว แล้วถ่วงน้ำหนักด้วยน้ำหนักเดียวกัน
+  // (เทียบบนฐานเดียวกับราคาซื้อจริง เพื่อให้สรุป "ถูก/แพงกว่าคาดการณ์" ถูกต้อง)
+  let fW=0, fWP=0;
+  kpiData.forEach(r=>{
+    const ff=_getForecastPrice(r[2], r[5], r[6], kpiMon);
+    if(ff){ fW+=r[3]; fWP+=r[3]*ff.price; }
+  });
+  const fcAvg = fW>0 ? Math.round(fWP/fW*10)/10 : 0;
+  const diff  = fcAvg ? Math.round((avgP-fcAvg)*10)/10 : 0;
+  const farms = new Set(kpiData.map(r=>r[1])).size;
 
-  _s('rc-avgprice', avgP ? '฿'+avgP.toFixed(1) : '—');
-  _s('rc-forecast', fc   ? '฿'+fc.price.toFixed(0)+' ('+fc.sizeRange+')' : '—');
-  _s('rc-diff',     diff ? (diff>0?'+':'')+diff.toFixed(1)+' ฿' : '—');
+  _s('rc-avgprice', avgP  ? '฿'+avgP.toFixed(1) : '—');
+  _s('rc-forecast', fcAvg ? '฿'+fcAvg.toFixed(1) : '—');
+  _s('rc-diff',     diff  ? (diff>0?'+':'')+diff.toFixed(1)+' ฿' : '—');
   _s('rc-lastdate', kpiMon);
   _s('rc-farmcount', farms+' farms | '+kpiData.length+' lots');
   const diffCard = document.getElementById('rc-diff-card');
-  if(diffCard) diffCard.style.borderTopColor = diff>0?'var(--green)':diff<0?'var(--red)':'var(--border)';
+  // ซื้อถูกกว่าคาดการณ์ (diff<0) = ดี = เขียว, ซื้อแพงกว่า (diff>0) = แดง
+  if(diffCard) diffCard.style.borderTopColor = diff<0?'var(--green)':diff>0?'var(--red)':'var(--border)';
 
   // Trend chart — daily avg price vs forecast (size 50-70)
   const days = [...new Set(filt.filter(r=>r[2]>=50&&r[2]<=70).map(r=>r[0]))].sort().slice(-30);
