@@ -438,9 +438,9 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <!-- ══ TAB 4: PRICE FORECAST ══ -->
 <div class="tab-pane" id="t4">
   <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi cg"><div class="kpi-lbl">🦐 กุ้งขาวสด (ล่าสุด)</div><div class="kpi-val" id="pr-wf">—</div><div class="kpi-sub">฿/กก. (ขนาด 60-70)</div></div>
-    <div class="kpi cc"><div class="kpi-lbl">🦐 กุ้งขาวมีชีวิต (ล่าสุด)</div><div class="kpi-val" id="pr-wl">—</div><div class="kpi-sub">฿/กก. (ขนาด 60-70)</div></div>
-    <div class="kpi cn"><div class="kpi-lbl">🦐 กุ้งดำสด (ล่าสุด)</div><div class="kpi-val" id="pr-bf">—</div><div class="kpi-sub">฿/กก. (ขนาด 60-70)</div></div>
+    <div class="kpi cg"><div class="kpi-lbl">🦐 กุ้งขาวสด (ล่าสุด)</div><div class="kpi-val" id="pr-wf">—</div><div class="kpi-sub" id="pr-wf-sub">฿/กก. (ขนาด 60-70)</div></div>
+    <div class="kpi cc"><div class="kpi-lbl">🦐 กุ้งขาวมีชีวิต (ล่าสุด)</div><div class="kpi-val" id="pr-wl">—</div><div class="kpi-sub" id="pr-wl-sub">฿/กก. (ขนาด 45-50)</div></div>
+    <div class="kpi cn"><div class="kpi-lbl">🦐 กุ้งดำสด (ล่าสุด)</div><div class="kpi-val" id="pr-bf">—</div><div class="kpi-sub" id="pr-bf-sub">฿/กก. (ขนาด 50-60)</div></div>
     <div class="kpi ca"><div class="kpi-lbl">📅 ข้อมูลล่าสุด</div><div class="kpi-val" id="pr-month" style="font-size:16px">—</div><div class="kpi-sub" id="pr-week">—</div></div>
   </div>
   <div class="row2b" style="margin-bottom:14px">
@@ -1839,17 +1839,29 @@ function _renderTab4(){
   const lastData = _pd.filter(r=>r[0]===lastMon);
   const lastWeek = lastData[lastData.length-1]?.[1] || '';
 
-  // KPI — size 58-60 or closest
-  const kpiRow = lastData.find(r=>r[1]===lastWeek&&r[2]==='58-60')
-              || lastData.find(r=>r[1]===lastWeek&&r[2]==='61-63')
-              || lastData.find(r=>r[1]===lastWeek);
-  if(kpiRow){
-    _s('pr-wf', kpiRow[3] ? '฿'+kpiRow[3].toFixed(0) : '—');
-    _s('pr-wl', kpiRow[4] ? '฿'+kpiRow[4].toFixed(0) : '—');
-    _s('pr-bf', kpiRow[5] ? '฿'+kpiRow[5].toFixed(0) : '—');
-    _s('pr-month', lastMon);
-    _s('pr-week', lastWeek);
-  }
+  // KPI — เลือกขนาดที่เป็นกลุ่มซื้อมากสุดของแต่ละประเภท
+  //   กุ้งขาวสด(col3)=60-70, กุ้งขาวมีชีวิต(col4)=45-50, กุ้งดำสด(col5)=50-60
+  const wkRows = lastData.filter(r=>r[1]===lastWeek);
+  const _pickByCol = (col, target) => {
+    let best=null, bd=1e9;
+    for(const r of wkRows){
+      const p=r[col]; if(!p)continue;
+      const parts=String(r[2]).split('-').map(Number);
+      const mid=parts.length===2?(parts[0]+parts[1])/2:parts[0];
+      const d=Math.abs(mid-target);
+      if(d<bd){ bd=d; best={price:p, sizeRange:r[2]}; }
+    }
+    return best;
+  };
+  const wf=_pickByCol(3,65), wl=_pickByCol(4,47.5), bf=_pickByCol(5,55);
+  _s('pr-wf', wf ? '฿'+wf.price.toFixed(0) : '—');
+  _s('pr-wl', wl ? '฿'+wl.price.toFixed(0) : '—');
+  _s('pr-bf', bf ? '฿'+bf.price.toFixed(0) : '—');
+  if(wf) _s('pr-wf-sub','฿/กก. (ขนาด '+wf.sizeRange+')');
+  if(wl) _s('pr-wl-sub','฿/กก. (ขนาด '+wl.sizeRange+')');
+  if(bf) _s('pr-bf-sub','฿/กก. (ขนาด '+bf.sizeRange+')');
+  _s('pr-month', lastMon);
+  _s('pr-week', lastWeek);
 
   // Size chart (latest week)
   const sizeData = lastData.filter(r=>r[1]===lastWeek);
