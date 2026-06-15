@@ -543,19 +543,24 @@ console.log('%c[KST] BUILD v17.4-tzfix2 (12/06/2026)', 'color:#C8982A;font-weigh
 const CFG1 = {
   /* ใช้ SharePoint site drive แทน personal OneDrive
      เพื่อให้ผู้ใช้ทุกคนในองค์กรเข้าถึงข้อมูลได้เหมือนกัน */
-  /* SharePoint site KSTRMUPDATEV2 > Shared Documents (ทุกคนในองค์กรเข้าถึงได้) */
+  /* SharePoint site KSTRMUPDATEV2 > Shared Documents (ทุกคนในองค์กรเข้าถึงได้)
+     อ่านจากไฟล์กลางบนไซต์ทีมเท่านั้น (ไม่ใช้สำเนาส่วนตัวใน OneDrive)
+     หมายเหตุ: RM RECORD เป็นข้อมูลอ้างอิง/ตรวจสอบ — รายงานหลักใช้ RM-RECIVE (CFG2) */
   driveId:  'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
   fileId:   '',
   filePath: 'ADD (5).xlsx',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQTEwdEFvQ0VwUlJZUm4tYzdCMUtDdUFUSkZLTmM4SU5xUmtMekZyYi1nRzJjP2U9U2lscmxh',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUJzWkZvZEJsdXhUSkk1UnhWS0YzZXdBVnQ0VzhVSVZkV0k2U3dfdzE5TWVsTT9lPUdNb3ZjMQ',
   sheet:    'RM RECORD',
   sheetAlt: 'SOURCE',
 };
 const CFG2 = {
-  driveId:'b!D6giGoE1uESBO7PRA7RLxFqpAw5iWfRFiv_0gjMFy8izTfh03nDXRLiLCyyr3IrK',
-  fileId: '014NXMQUAVTHPF7PMMLVEJWEVJ5ENIM2FV',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUQzeHhpOHhYVDJTYmNiQ1pJNVlMbVFBYTdsOVJTNmxjZm1MMXFqZ2JRX1d2ST9lPWIxVmF0cw',
-  tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUUQzeHhpOHhYVDJTYmNiQ1pJNVlMbVFBYTdsOVJTNmxjZm1MMXFqZ2JRX1d2ST9lPWIxVmF0cw',
+  /* แหล่งข้อมูลกลางขององค์กร: Procurement_Master_File.xlsx บนไซต์ทีม KSTRMUPDATEV2
+     (Shared Documents) — ทุกคนในองค์กรเห็นไฟล์ชุดเดียวกัน ไม่ใช่สำเนาส่วนตัวใน OneDrive
+     ไม่ตั้ง fileId/filePath เพื่อให้ resolve ผ่าน sharingToken ของลิงก์ไซต์โดยตรง */
+  driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
+  fileId: '',
+  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
+  tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   sheetPlan:    'PLAN_DAILY',
   sheetActual:  'ACTUAL_TRACKING',
   sheetPrice:   'ราคา  RM คิดขาย',
@@ -804,7 +809,20 @@ function _parseStaticData(){
       district:'',province:'',mortality:0,remark:''};
   }).filter(function(r){return r.date&&r.weight>0;});
 }
-let rawRM = _parseStaticData();
+
+/* แปลงข้อมูล RM-RECIVE (รับเข้าจริง) → รูปแบบ record เดียวกับรายงาน RM RECORD
+   เพื่อให้รายงานน้ำหนัก/มูลค่าใช้ค่าการซื้อจริงจาก sheet RM-RECIVE
+   row format (หลัง parse): [date, farmCode, size, weight, price, species, type] */
+function _receiveToRM(arr){
+  return (arr||[]).map(function(r){
+    var w=+r[3]||0, p=+r[4]||0;
+    return {date:String(r[0]||'').slice(0,10),supplier:String(r[1]||'').trim(),
+      weight:w,size:+r[2]||0,typeRM:String(r[6]||'').trim(),
+      price:p,species:String(r[5]||'').trim(),value:w*p,
+      district:'',province:'',mortality:0,remark:''};
+  }).filter(function(r){return r.date&&r.weight>0;});
+}
+let rawRM = _receiveToRM(typeof STATIC_RECEIVE!=='undefined'?STATIC_RECEIVE:[]);
 let filteredRM=[];
 let planData=STATIC_PLAN||[];
 let actualData=STATIC_ACTUAL||[];
@@ -875,25 +893,24 @@ async function loadAll(){
   setLB(10);
   _dqRaw={};
   try{
-    // ── RM RECORD ──
+    // ── RM RECORD (อ้างอิง/ตรวจสอบเท่านั้น — รายงานหลักใช้ RM-RECIVE) ──
     setLB(20);
-    let rows;
-    try{ rows = await fetchSheet(CFG1, CFG1.sheet); }
-    catch(e1){
-      if(CFG1.sheetAlt){
-        console.warn('[KST] sheet primary failed, trying sheetAlt:', e1.message);
-        rows = await fetchSheet(CFG1, CFG1.sheetAlt);
-      } else { throw e1; }
-    }
-    _dqRaw.rm = rows;
-    if(rows && rows.length > 1){
-      _detectCols(rows[0]);
-      const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
-      if(liveRM.length > 0){
-        rawRM = liveRM;
-        console.log('[KST] ✅ Live RM:', rawRM.length, 'rows');
+    try{
+      let rows;
+      try{ rows = await fetchSheet(CFG1, CFG1.sheet); }
+      catch(e1){
+        if(CFG1.sheetAlt){
+          console.warn('[KST] sheet primary failed, trying sheetAlt:', e1.message);
+          rows = await fetchSheet(CFG1, CFG1.sheetAlt);
+        } else { throw e1; }
       }
-    }
+      _dqRaw.rm = rows;
+      if(rows && rows.length > 1){
+        _detectCols(rows[0]);
+        const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
+        console.log('[KST] RM RECORD (อ้างอิงเท่านั้น):', liveRM.length, 'rows');
+      }
+    }catch(e){ _dqRaw.rmErr=e.message; console.warn('[KST] RM RECORD fallback:', e.message); }
 
     // ── PLAN_DAILY ──
     setLB(55);
@@ -1011,7 +1028,7 @@ async function loadAll(){
           const r=rcRows[i];
           if(!r||!r[0])continue;
           const yr=parseFloat(r[5]);
-          if(yr!==2026)continue;
+          if(!(yr>=2025))continue;   // รวมข้อมูลปี 2025 ขึ้นไป (ข้ามแถวที่ปีว่าง/ไม่ถูกต้อง)
           let dt=r[1];
           if(typeof dt==='number'&&dt>40000) dt=new Date(Math.round((dt-25569)*86400000));
           else dt=new Date(dt);
@@ -1029,7 +1046,8 @@ async function loadAll(){
         if(newRc.length>0){
           newRc.sort((a,b)=>b[0].localeCompare(a[0]));
           receiveData=newRc;
-          console.log('[KST] ✅ RM-RECIVE live:', newRc.length, 'rows');
+          rawRM=_receiveToRM(newRc);
+          console.log('[KST] ✅ RM-RECIVE live:', newRc.length, 'rows | rawRM:', rawRM.length);
           _renderTab5();
         }
       }
@@ -1065,7 +1083,7 @@ async function loadAll(){
     setLB(0);
     if(!rawRM.length){
       /* กรณีที่ snapshot ยังไม่โหลด */
-      rawRM=_parseStaticData();planData=STATIC_PLAN;actualData=STATIC_ACTUAL;
+      rawRM=_receiveToRM(STATIC_RECEIVE);planData=STATIC_PLAN;actualData=STATIC_ACTUAL;
       if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const latest=new Date(dates[dates.length-1]);const from=new Date(latest);from.setDate(from.getDate()-29);document.getElementById('fFrom').value=_fmt(from);document.getElementById('fTo').value=_fmt(latest);}
       applyFilter();
       document.getElementById('dashContent2').style.display='block';
@@ -1903,7 +1921,7 @@ Chart.defaults.font.size=11;
 function forceSnapshot(){
   const fb=document.getElementById('snapFallbackBtn');
   if(fb) fb.style.display='none';
-  rawRM      = _parseStaticData();
+  rawRM      = _receiveToRM(STATIC_RECEIVE);
   planData   = STATIC_PLAN;
   actualData = STATIC_ACTUAL;
   if(rawRM.length){
@@ -1938,7 +1956,7 @@ function useSnapshot(){
   hideAuth();
   document.getElementById('userLabel').textContent = '📊 Snapshot Mode';
   // Load from static data only
-  rawRM = _parseStaticData();
+  rawRM = _receiveToRM(STATIC_RECEIVE);
   planData = STATIC_PLAN;
   actualData = STATIC_ACTUAL;
   console.log('[KST] Snapshot loaded:', rawRM.length, 'RM records');
