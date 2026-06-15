@@ -480,10 +480,10 @@ tr:hover td{background:rgba(200,152,42,.03)}
 <!-- ══ TAB 5: PRICE COMPARE ══ -->
 <div class="tab-pane" id="t5">
   <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi cg"><div class="kpi-lbl">📊 ราคาเฉลี่ยถ่วงน้ำหนัก</div><div class="kpi-val" id="rc-avgprice">—</div><div class="kpi-sub">฿/กก. (เดือนล่าสุด)</div></div>
+    <div class="kpi cg"><div class="kpi-lbl">📊 ราคาเฉลี่ยถ่วงน้ำหนัก</div><div class="kpi-val" id="rc-avgprice">—</div><div class="kpi-sub">฿/กก. (เดือนที่เลือก)</div></div>
     <div class="kpi cc"><div class="kpi-lbl">📋 ราคาคาดการณ์</div><div class="kpi-val" id="rc-forecast">—</div><div class="kpi-sub">฿/กก. (size ใกล้เคียง)</div></div>
     <div class="kpi" id="rc-diff-card"><div class="kpi-lbl">📈 ต่างจากคาดการณ์</div><div class="kpi-val" id="rc-diff">—</div><div class="kpi-sub" id="rc-diff-sub">฿/กก.</div></div>
-    <div class="kpi ca"><div class="kpi-lbl">📅 ข้อมูลล่าสุด</div><div class="kpi-val" id="rc-lastdate" style="font-size:16px">—</div><div class="kpi-sub" id="rc-farmcount">—</div></div>
+    <div class="kpi ca"><div class="kpi-lbl">📅 เดือนที่เลือก</div><div class="kpi-val" id="rc-lastdate" style="font-size:16px">—</div><div class="kpi-sub" id="rc-farmcount">—</div></div>
   </div>
   <div class="row2b" style="margin-bottom:14px">
     <div class="card">
@@ -1626,12 +1626,18 @@ let receiveData = (typeof STATIC_RECEIVE!=='undefined'&&STATIC_RECEIVE.length)?S
    กุ้งสด (Broker)       → กุ้งขาวสด [col3] / กุ้งดำสด [col5]
    กุ้งมีชีวิต (จับเป็น) → กุ้งขาวมีชีวิต [col4] / กุ้งดำมีชีวิต [col6]
 */
-function _getForecastPrice(size, species, typeRm){
+function _getForecastPrice(size, species, typeRm, targetMon){
   const data = (priceData&&priceData.length)?priceData:(typeof STATIC_PRICE!=='undefined'?STATIC_PRICE:[]);
   if(!data.length) return null;
   const months = [...new Set(data.map(r=>r[0]))];
-  const lastMon = months[months.length-1];
-  const monthData = data.filter(r=>r[0]===lastMon);
+  /* map เดือนที่เลือก (YYYY-MM) → ชื่อเดือนไทย เพื่อให้ราคาคาดการณ์ตรงตามเดือน */
+  const TH_MON_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  let wantMon = months[months.length-1];   // ค่าเริ่มต้น = เดือนล่าสุดของตารางราคา
+  if(targetMon){
+    const thName = TH_MON_FULL[parseInt(String(targetMon).slice(5,7),10)-1];
+    if(thName && months.includes(thName)) wantMon = thName;
+  }
+  const monthData = data.filter(r=>r[0]===wantMon);
 
   // Select price column based on type and species
   // col[3]=กุ้งขาวสด, col[4]=กุ้งขาวมีชีวิต, col[5]=กุ้งดำสด, col[6]=กุ้งดำมีชีวิต
@@ -1653,7 +1659,7 @@ function _getForecastPrice(size, species, typeRm){
     const diff = Math.abs(mid-size);
     if(diff<bestDiff){
       bestDiff=diff;
-      best={price, sizeRange:r[2], month:lastMon,
+      best={price, sizeRange:r[2], month:wantMon,
             priceType:isLive?(isBlack?'กุ้งดำมีชีวิต':'กุ้งขาวมีชีวิต'):(isBlack?'กุ้งดำสด':'กุ้งขาวสด')};
     }
   }
@@ -1685,21 +1691,22 @@ function _renderTab5(){
     return mok && sok;
   });
 
-  // KPI — weighted avg of latest month
-  const latest = data[0]?.[0]?.slice(0,7) || '';
-  const latestData = data.filter(r=>r[0].startsWith(latest));
-  const totalW  = latestData.reduce((s,r)=>s+r[3],0);
-  const totalWP = latestData.reduce((s,r)=>s+(r[3]*r[4]),0);
+  // KPI — ราคาถ่วงน้ำหนักตามเดือนที่เลือก (ถ้าเลือก 'ทุกเดือน' = เดือนล่าสุด)
+  const latest  = data[0]?.[0]?.slice(0,7) || '';
+  const kpiMon  = (selMon!=='all') ? selMon : latest;
+  const kpiData = filt.filter(r=>r[0].startsWith(kpiMon));
+  const totalW  = kpiData.reduce((s,r)=>s+r[3],0);
+  const totalWP = kpiData.reduce((s,r)=>s+(r[3]*r[4]),0);
   const avgP    = totalW>0 ? Math.round(totalWP/totalW*10)/10 : 0;
-  const fc      = _getForecastPrice(60,'กุ้งขาว','กุ้ง Broker');
+  const fc      = _getForecastPrice(60, selSp==='all'?'กุ้งขาว':selSp, 'กุ้ง Broker', kpiMon);
   const diff    = fc ? Math.round((avgP-fc.price)*10)/10 : 0;
-  const farms   = new Set(latestData.map(r=>r[1])).size;
+  const farms   = new Set(kpiData.map(r=>r[1])).size;
 
   _s('rc-avgprice', avgP ? '฿'+avgP.toFixed(1) : '—');
   _s('rc-forecast', fc   ? '฿'+fc.price.toFixed(0)+' ('+fc.sizeRange+')' : '—');
   _s('rc-diff',     diff ? (diff>0?'+':'')+diff.toFixed(1)+' ฿' : '—');
-  _s('rc-lastdate', latest);
-  _s('rc-farmcount', farms+' farms | '+latestData.length+' lots');
+  _s('rc-lastdate', kpiMon);
+  _s('rc-farmcount', farms+' farms | '+kpiData.length+' lots');
   const diffCard = document.getElementById('rc-diff-card');
   if(diffCard) diffCard.style.borderTopColor = diff>0?'var(--green)':diff<0?'var(--red)':'var(--border)';
 
@@ -1711,7 +1718,7 @@ function _renderTab5(){
     const tw = dr.reduce((s,r)=>s+r[3],0);
     const tp = dr.reduce((s,r)=>s+(r[3]*r[4]),0);
     trendActual.push(tw>0?Math.round(tp/tw*10)/10:null);
-    const ff = _getForecastPrice(60,selSp==='all'?'กุ้งขาว':selSp,'กุ้ง Broker');
+    const ff = _getForecastPrice(60,selSp==='all'?'กุ้งขาว':selSp,'กุ้ง Broker',d.slice(0,7));
     trendForecast.push(ff?ff.price:null);
   });
   _rb('cRcTrend','rcTrend',{type:'line',
@@ -1729,7 +1736,7 @@ function _renderTab5(){
 
   // Size chart — avg price by size this month
   const sizeGrp={};
-  filt.filter(r=>r[0].startsWith(latest)).forEach(r=>{
+  filt.filter(r=>r[0].startsWith(kpiMon)).forEach(r=>{
     const s=String(r[2]);
     if(!sizeGrp[s]) sizeGrp[s]={w:0,wp:0};
     sizeGrp[s].w+=r[3]; sizeGrp[s].wp+=r[3]*r[4];
@@ -1737,7 +1744,7 @@ function _renderTab5(){
   const sizeKeys = Object.keys(sizeGrp).sort((a,b)=>+a-+b);
   const sizeActual = sizeKeys.map(s=>Math.round(sizeGrp[s].wp/sizeGrp[s].w*10)/10);
   const sizeForecast = sizeKeys.map(s=>{
-    const ff=_getForecastPrice(+s,selSp==='all'?'กุ้งขาว':selSp,'กุ้ง Broker');
+    const ff=_getForecastPrice(+s,selSp==='all'?'กุ้งขาว':selSp,'กุ้ง Broker',kpiMon);
     return ff?ff.price:null;
   });
   _rb('cRcSize','rcSz',{type:'bar',
@@ -1757,7 +1764,7 @@ function _renderTab5(){
   const tbody = document.getElementById('rcBody');
   if(!tbody) return;
   tbody.innerHTML = filt.map(r=>{
-    const fc2 = _getForecastPrice(r[2],r[5],r[6]);
+    const fc2 = _getForecastPrice(r[2],r[5],r[6],r[0].slice(0,7));
     const fcP  = fc2 ? fc2.price : null;
     const diff2= fcP ? Math.round((r[4]-fcP)*10)/10 : null;
     const diffCls = diff2===null?'':diff2>0?'style="color:var(--green)"':diff2<0?'style="color:var(--red)"':'';
