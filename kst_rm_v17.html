@@ -543,11 +543,13 @@ console.log('%c[KST] BUILD v17.4-tzfix2 (12/06/2026)', 'color:#C8982A;font-weigh
 const CFG1 = {
   /* ใช้ SharePoint site drive แทน personal OneDrive
      เพื่อให้ผู้ใช้ทุกคนในองค์กรเข้าถึงข้อมูลได้เหมือนกัน */
-  /* SharePoint site KSTRMUPDATEV2 > Shared Documents (ทุกคนในองค์กรเข้าถึงได้) */
+  /* SharePoint site KSTRMUPDATEV2 > Shared Documents (ทุกคนในองค์กรเข้าถึงได้)
+     อ่านจากไฟล์กลางบนไซต์ทีมเท่านั้น (ไม่ใช้สำเนาส่วนตัวใน OneDrive)
+     หมายเหตุ: RM RECORD เป็นข้อมูลอ้างอิง/ตรวจสอบ — รายงานหลักใช้ RM-RECIVE (CFG2) */
   driveId:  'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
   fileId:   '',
   filePath: 'ADD (5).xlsx',
-  sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUtbXkuc2hhcmVwb2ludC5jb20vOng6L2cvcGVyc29uYWwvdG9yc2FrX2FyX2tzdC1oYXR5YWlfY29tL0lRQTEwdEFvQ0VwUlJZUm4tYzdCMUtDdUFUSkZLTmM4SU5xUmtMekZyYi1nRzJjP2U9U2lscmxh',
+  sharingToken: '',
   sheet:    'RM RECORD',
   sheetAlt: 'SOURCE',
 };
