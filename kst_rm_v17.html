@@ -804,7 +804,20 @@ function _parseStaticData(){
       district:'',province:'',mortality:0,remark:''};
   }).filter(function(r){return r.date&&r.weight>0;});
 }
-let rawRM = _parseStaticData();
+
+/* แปลงข้อมูล RM-RECIVE (รับเข้าจริง) → รูปแบบ record เดียวกับรายงาน RM RECORD
+   เพื่อให้รายงานน้ำหนัก/มูลค่าใช้ค่าการซื้อจริงจาก sheet RM-RECIVE
+   row format (หลัง parse): [date, farmCode, size, weight, price, species, type] */
+function _receiveToRM(arr){
+  return (arr||[]).map(function(r){
+    var w=+r[3]||0, p=+r[4]||0;
+    return {date:String(r[0]||'').slice(0,10),supplier:String(r[1]||'').trim(),
+      weight:w,size:+r[2]||0,typeRM:String(r[6]||'').trim(),
+      price:p,species:String(r[5]||'').trim(),value:w*p,
+      district:'',province:'',mortality:0,remark:''};
+  }).filter(function(r){return r.date&&r.weight>0;});
+}
+let rawRM = _receiveToRM(typeof STATIC_RECEIVE!=='undefined'?STATIC_RECEIVE:[]);
 let filteredRM=[];
 let planData=STATIC_PLAN||[];
 let actualData=STATIC_ACTUAL||[];
@@ -875,25 +888,24 @@ async function loadAll(){
   setLB(10);
   _dqRaw={};
   try{
-    // ── RM RECORD ──
+    // ── RM RECORD (อ้างอิง/ตรวจสอบเท่านั้น — รายงานหลักใช้ RM-RECIVE) ──
     setLB(20);
-    let rows;
-    try{ rows = await fetchSheet(CFG1, CFG1.sheet); }
-    catch(e1){
-      if(CFG1.sheetAlt){
-        console.warn('[KST] sheet primary failed, trying sheetAlt:', e1.message);
-        rows = await fetchSheet(CFG1, CFG1.sheetAlt);
-      } else { throw e1; }
-    }
-    _dqRaw.rm = rows;
-    if(rows && rows.length > 1){
-      _detectCols(rows[0]);
-      const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
-      if(liveRM.length > 0){
-        rawRM = liveRM;
-        console.log('[KST] ✅ Live RM:', rawRM.length, 'rows');
+    try{
+      let rows;
+      try{ rows = await fetchSheet(CFG1, CFG1.sheet); }
+      catch(e1){
+        if(CFG1.sheetAlt){
+          console.warn('[KST] sheet primary failed, trying sheetAlt:', e1.message);
+          rows = await fetchSheet(CFG1, CFG1.sheetAlt);
+        } else { throw e1; }
       }
-    }
+      _dqRaw.rm = rows;
+      if(rows && rows.length > 1){
+        _detectCols(rows[0]);
+        const liveRM = rows.slice(1).map(_parseRM).filter(r=>r.date&&r.weight>0&&!_excl(r.typeRM));
+        console.log('[KST] RM RECORD (อ้างอิงเท่านั้น):', liveRM.length, 'rows');
+      }
+    }catch(e){ _dqRaw.rmErr=e.message; console.warn('[KST] RM RECORD fallback:', e.message); }
 
     // ── PLAN_DAILY ──
     setLB(55);
@@ -1029,7 +1041,8 @@ async function loadAll(){
         if(newRc.length>0){
           newRc.sort((a,b)=>b[0].localeCompare(a[0]));
           receiveData=newRc;
-          console.log('[KST] ✅ RM-RECIVE live:', newRc.length, 'rows');
+          rawRM=_receiveToRM(newRc);
+          console.log('[KST] ✅ RM-RECIVE live:', newRc.length, 'rows | rawRM:', rawRM.length);
           _renderTab5();
         }
       }
@@ -1065,7 +1078,7 @@ async function loadAll(){
     setLB(0);
     if(!rawRM.length){
       /* กรณีที่ snapshot ยังไม่โหลด */
-      rawRM=_parseStaticData();planData=STATIC_PLAN;actualData=STATIC_ACTUAL;
+      rawRM=_receiveToRM(STATIC_RECEIVE);planData=STATIC_PLAN;actualData=STATIC_ACTUAL;
       if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const latest=new Date(dates[dates.length-1]);const from=new Date(latest);from.setDate(from.getDate()-29);document.getElementById('fFrom').value=_fmt(from);document.getElementById('fTo').value=_fmt(latest);}
       applyFilter();
       document.getElementById('dashContent2').style.display='block';
@@ -1903,7 +1916,7 @@ Chart.defaults.font.size=11;
 function forceSnapshot(){
   const fb=document.getElementById('snapFallbackBtn');
   if(fb) fb.style.display='none';
-  rawRM      = _parseStaticData();
+  rawRM      = _receiveToRM(STATIC_RECEIVE);
   planData   = STATIC_PLAN;
   actualData = STATIC_ACTUAL;
   if(rawRM.length){
@@ -1938,7 +1951,7 @@ function useSnapshot(){
   hideAuth();
   document.getElementById('userLabel').textContent = '📊 Snapshot Mode';
   // Load from static data only
-  rawRM = _parseStaticData();
+  rawRM = _receiveToRM(STATIC_RECEIVE);
   planData = STATIC_PLAN;
   actualData = STATIC_ACTUAL;
   console.log('[KST] Snapshot loaded:', rawRM.length, 'RM records');
