@@ -1026,14 +1026,20 @@ async function loadAll(){
         const newRc=[];
         for(let i=3;i<rcRows.length;i++){
           const r=rcRows[i];
-          if(!r||!r[0])continue;
-          const yr=parseFloat(r[5]);
-          if(!(yr>=2025))continue;   // รวมข้อมูลปี 2025 ขึ้นไป (ข้ามแถวที่ปีว่าง/ไม่ถูกต้อง)
+          if(!r)continue;
           let dt=r[1];
-          if(typeof dt==='number'&&dt>40000) dt=new Date(Math.round((dt-25569)*86400000));
-          else dt=new Date(dt);
+          if(dt==null||dt==='')continue;
+          if(typeof dt==='number'&&dt>40000){
+            dt=new Date(Math.round((dt-25569)*86400000));
+          } else {
+            const s=String(dt).trim();
+            const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            dt = m ? new Date(Date.UTC(+m[3],+m[2]-1,+m[1])) : new Date(s);
+          }
           if(isNaN(dt))continue;
-          const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
+          const y=dt.getUTCFullYear();
+          if(y<2025)continue;   // กรองปี 2025 ขึ้นไป (อิงจากวันที่จริง ไม่พึ่งคอลัมน์ปี/คอลัมน์แรกที่อาจว่างในแถวล่าสุด)
+          const ds=y+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
           const fc=String(r[2]||'').trim();
           const sz=parseFloat(r[7])||0;
           const wt=parseFloat(r[9])||0;
