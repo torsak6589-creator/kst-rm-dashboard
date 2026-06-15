@@ -816,7 +816,7 @@ function _parseStaticData(){
 function _receiveToRM(arr){
   return (arr||[]).map(function(r){
     var w=+r[3]||0, p=+r[4]||0;
-    return {date:String(r[0]||'').slice(0,10),supplier:String(r[1]||'').trim(),
+    return {date:String(r[0]||'').slice(0,10),supplier:String(r[7]||r[1]||'').trim(),
       weight:w,size:+r[2]||0,typeRM:String(r[6]||'').trim(),
       price:p,species:String(r[5]||'').trim(),value:w*p,
       district:'',province:'',mortality:0,remark:''};
@@ -1047,8 +1047,9 @@ async function loadAll(){
           const wp=parseFloat(r[11])||0;
           const sp=String(r[6]||'').trim();
           const tp=String(r[3]||'').trim();
+          const sup=String(r[0]||'').trim();   // คอลัมน์ A = ชื่อผู้ผลิต/supplier (คอลัมน์ C = farm code)
           if(!fc||sz<=0||wt<=0)continue;
-          newRc.push([ds,fc,sz,wt,wp>0&&wt>0?Math.round(wp/wt*100)/100:0,sp,tp]);
+          newRc.push([ds,fc,sz,wt,wp>0&&wt>0?Math.round(wp/wt*100)/100:0,sp,tp,sup]);
         }
         if(newRc.length>0){
           newRc.sort((a,b)=>b[0].localeCompare(a[0]));
