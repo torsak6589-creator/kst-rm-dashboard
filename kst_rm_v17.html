@@ -1402,8 +1402,8 @@ function _typeDonut(){
   document.getElementById('typeLegs').innerHTML=L.map((l,i)=>`<div style="display:flex;align-items:center;gap:4px;font-size:9px"><span style="width:7px;height:7px;border-radius:50%;background:${C[i]};display:inline-block"><\/span>${l} <b style="color:var(--text)">${tot?(t[l]/tot*100).toFixed(1):0}%<\/b><\/div>`).join('');
 }
 function _priceChart(){
-  const m={};filteredRM.forEach(r=>{if(!r.price||!r.date)return;const k=r.typeRM.includes('เป็น')?'l':'d';if(!m[r.date])m[r.date]={l:[],d:[]};m[r.date][k].push(r.price);});
-  const L=Object.keys(m).sort(),avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
+  const m={};filteredRM.forEach(r=>{if(!r.price||!r.date||!(r.weight>0))return;const k=r.typeRM.includes('เป็น')?'l':'d';if(!m[r.date])m[r.date]={l:{wp:0,w:0},d:{wp:0,w:0}};m[r.date][k].wp+=r.price*r.weight;m[r.date][k].w+=r.weight;});
+  const L=Object.keys(m).sort(),avg=o=>o&&o.w>0?o.wp/o.w:null;  // ราคาเฉลี่ยถ่วงน้ำหนักรายวัน
   _rb('cPrice','price',{type:'line',data:{labels:L.map(d=>d.slice(5)),datasets:[{label:'กุ้งเป็น',data:L.map(d=>avg(m[d].l)),borderColor:'#C8982A',backgroundColor:'rgba(200,152,42,.08)',tension:.4,fill:true,pointRadius:0,spanGaps:true},{label:'กุ้งดอง',data:L.map(d=>avg(m[d].d)),borderColor:'#00BCD4',backgroundColor:'rgba(0,188,212,.06)',tension:.4,fill:true,pointRadius:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},color:'#4A5568'}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{maxTicksLimit:12,color:'#7A8CA3',font:{size:9}}},y:{grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+' ฿',color:'#7A8CA3',font:{size:9}}}}}});
 }
 function _supBarChart(){
@@ -1436,16 +1436,16 @@ function _renderSizePrice(){
   filteredRM.forEach(r=>{
     if(!r.size||r.size<=0)return;
     const k=sizeKey(r.size);
-    if(!sm[k])sm[k]={vol:0,prices:[],count:0};
+    if(!sm[k])sm[k]={vol:0,prices:[],count:0,wp:0,pw:0};
     sm[k].vol+=r.weight;
     sm[k].count++;
-    if(r.price>0)sm[k].prices.push(r.price);
+    if(r.price>0){sm[k].prices.push(r.price);sm[k].wp+=r.price*r.weight;sm[k].pw+=r.weight;}
   });
 
   const sizes=SIZE_ORDER.filter(s=>sm[s]);
   const vols=sizes.map(s=>sm[s].vol);
-  const avgPrices=sizes.map(s=>sm[s].prices.length?
-    sm[s].prices.reduce((a,b)=>a+b,0)/sm[s].prices.length:0);
+  // ราคาเฉลี่ยถ่วงน้ำหนักต่อ size = Σ(ราคา×น้ำหนัก)/Σ(น้ำหนักที่มีราคา)
+  const avgPrices=sizes.map(s=>sm[s].pw>0?sm[s].wp/sm[s].pw:0);
   const totVol=vols.reduce((a,b)=>a+b,0)||1;
 
   // Volume bar chart
