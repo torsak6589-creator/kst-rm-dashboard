@@ -1158,7 +1158,8 @@ function _matchType(str, filter) {
   // Broad groups
   if (f === 'กุ้งเป็น') return norm.includes('เป็น');
   if (f === 'กุ้งดอง')  return norm.includes('ดอง') || (norm.includes('broker') && !norm.includes('จับเป็น'));
-  return norm.includes(f);
+  // ค่าเริ่มต้น: จับคู่แบบตรงตัวเท่านั้น (กัน 'กุ้ง Broker' ไปแมตช์ 'กุ้ง Broker จับเป็น')
+  return norm === f;
 }
 function _matchSpecies(str, filter) {
   if (filter === 'all') return true;
