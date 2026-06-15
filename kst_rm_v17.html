@@ -880,6 +880,7 @@ async function loadAll(){
     document.getElementById('snapBadge').style.display='inline';
     document.getElementById('dataBadge').style.display='none';
     setFS('📊 Snapshot '+rawRM.length.toLocaleString()+' รายการ | กำลัง sync OneDrive...');
+    _buildDropdowns();
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
     // Pre-render Tab 4 with snapshot price data
@@ -1101,13 +1102,23 @@ async function loadAll(){
 function _buildDropdowns(){
   // Build species dropdown from actual rawRM data
   const speciesSel = document.getElementById('fSpecies');
-  const curVal = speciesSel.value;
-  const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
-  speciesSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
-    species.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
-  // Restore selection
-  if([...speciesSel.options].some(o=>o.value===curVal)) speciesSel.value=curVal;
-  else speciesSel.value='all';
+  if(speciesSel){
+    const curVal = speciesSel.value;
+    const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
+    speciesSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
+      species.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+    speciesSel.value = [...speciesSel.options].some(o=>o.value===curVal) ? curVal : 'all';
+  }
+  // Build RM type dropdown from actual rawRM data (RM-RECIVE) —
+  // กันค่าค้างที่เป็นประเภทของชุดข้อมูลเดิมแล้วกรองไม่เจอ → รีเซ็ตเป็น 'all'
+  const typeSel = document.getElementById('fType');
+  if(typeSel){
+    const curTy = typeSel.value;
+    const types = [...new Set(rawRM.map(r=>r.typeRM).filter(Boolean))].sort();
+    typeSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
+      types.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+    typeSel.value = [...typeSel.options].some(o=>o.value===curTy) ? curTy : 'all';
+  }
 }
 
 /* ══════ FILTER ══════ */
