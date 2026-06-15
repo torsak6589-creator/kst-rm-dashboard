@@ -880,6 +880,7 @@ async function loadAll(){
     document.getElementById('snapBadge').style.display='inline';
     document.getElementById('dataBadge').style.display='none';
     setFS('📊 Snapshot '+rawRM.length.toLocaleString()+' รายการ | กำลัง sync OneDrive...');
+    _buildDropdowns();
     applyFilter();
     document.getElementById('dashContent2').style.display='block';
     // Pre-render Tab 4 with snapshot price data
@@ -1026,14 +1027,20 @@ async function loadAll(){
         const newRc=[];
         for(let i=3;i<rcRows.length;i++){
           const r=rcRows[i];
-          if(!r||!r[0])continue;
-          const yr=parseFloat(r[5]);
-          if(!(yr>=2025))continue;   // รวมข้อมูลปี 2025 ขึ้นไป (ข้ามแถวที่ปีว่าง/ไม่ถูกต้อง)
+          if(!r)continue;
           let dt=r[1];
-          if(typeof dt==='number'&&dt>40000) dt=new Date(Math.round((dt-25569)*86400000));
-          else dt=new Date(dt);
+          if(dt==null||dt==='')continue;
+          if(typeof dt==='number'&&dt>40000){
+            dt=new Date(Math.round((dt-25569)*86400000));
+          } else {
+            const s=String(dt).trim();
+            const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            dt = m ? new Date(Date.UTC(+m[3],+m[2]-1,+m[1])) : new Date(s);
+          }
           if(isNaN(dt))continue;
-          const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
+          const y=dt.getUTCFullYear();
+          if(y<2025)continue;   // กรองปี 2025 ขึ้นไป (อิงจากวันที่จริง ไม่พึ่งคอลัมน์ปี/คอลัมน์แรกที่อาจว่างในแถวล่าสุด)
+          const ds=y+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
           const fc=String(r[2]||'').trim();
           const sz=parseFloat(r[7])||0;
           const wt=parseFloat(r[9])||0;
@@ -1095,13 +1102,23 @@ async function loadAll(){
 function _buildDropdowns(){
   // Build species dropdown from actual rawRM data
   const speciesSel = document.getElementById('fSpecies');
-  const curVal = speciesSel.value;
-  const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
-  speciesSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
-    species.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
-  // Restore selection
-  if([...speciesSel.options].some(o=>o.value===curVal)) speciesSel.value=curVal;
-  else speciesSel.value='all';
+  if(speciesSel){
+    const curVal = speciesSel.value;
+    const species = [...new Set(rawRM.map(r=>r.species).filter(Boolean))].sort();
+    speciesSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
+      species.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+    speciesSel.value = [...speciesSel.options].some(o=>o.value===curVal) ? curVal : 'all';
+  }
+  // Build RM type dropdown from actual rawRM data (RM-RECIVE) —
+  // กันค่าค้างที่เป็นประเภทของชุดข้อมูลเดิมแล้วกรองไม่เจอ → รีเซ็ตเป็น 'all'
+  const typeSel = document.getElementById('fType');
+  if(typeSel){
+    const curTy = typeSel.value;
+    const types = [...new Set(rawRM.map(r=>r.typeRM).filter(Boolean))].sort();
+    typeSel.innerHTML = '<option value="all">ทั้งหมด</option>' +
+      types.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+    typeSel.value = [...typeSel.options].some(o=>o.value===curTy) ? curTy : 'all';
+  }
 }
 
 /* ══════ FILTER ══════ */
