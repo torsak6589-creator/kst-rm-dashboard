@@ -1028,7 +1028,7 @@ async function loadAll(){
           const r=rcRows[i];
           if(!r||!r[0])continue;
           const yr=parseFloat(r[5]);
-          if(yr!==2026)continue;
+          if(!(yr>=2025))continue;   // รวมข้อมูลปี 2025 ขึ้นไป (ข้ามแถวที่ปีว่าง/ไม่ถูกต้อง)
           let dt=r[1];
           if(typeof dt==='number'&&dt>40000) dt=new Date(Math.round((dt-25569)*86400000));
           else dt=new Date(dt);
