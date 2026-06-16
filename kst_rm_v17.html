@@ -407,7 +407,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
     <div class="ct"><span class="d"></span>รายการซื้อวัตถุดิบล่าสุด</div>
     <div class="cs" style="margin-bottom:10px" id="latestDateLabel">ข้อมูลจาก ADD (5).xlsx — RM RECORD (7 วันล่าสุด)</div>
     <div class="tw"><table>
-      <thead><tr><th>วันที่</th><th>ชื่อเปิดบิล</th><th>ประเภท RM</th><th>ชนิดกุ้ง</th><th>ขนาด (ตัว/กก.)</th><th>ปริมาณ (กก.)</th><th>ราคา (฿/กก.)</th><th>มูลค่า (฿)</th></tr></thead>
+      <thead><tr><th>วันที่</th><th>ชื่อเปิดบิล</th><th>Farm Code</th><th>ประเภท RM</th><th>ชนิดกุ้ง</th><th>ขนาด (ตัว/กก.)</th><th>ปริมาณ (กก.)</th><th>ราคา (฿/กก.)</th><th>มูลค่า (฿)</th></tr></thead>
       <tbody id="planBody"></tbody>
     </table></div>
   </div>
@@ -816,7 +816,7 @@ function _parseStaticData(){
 function _receiveToRM(arr){
   return (arr||[]).map(function(r){
     var w=+r[3]||0, p=+r[4]||0;
-    return {date:String(r[0]||'').slice(0,10),supplier:String(r[7]||r[1]||'').trim(),
+    return {date:String(r[0]||'').slice(0,10),supplier:String(r[7]||r[1]||'').trim(),farmCode:String(r[1]||'').trim(),
       weight:w,size:+r[2]||0,typeRM:String(r[6]||'').trim(),
       price:p,species:String(r[5]||'').trim(),value:w*p,
       district:'',province:'',mortality:0,remark:''};
@@ -1605,6 +1605,7 @@ function _renderTab2(fr,to,ty,sp){
     return '<tr>'+
       '<td style="color:var(--muted)">'+r.date+'<\/td>'+
       '<td title="'+r.supplier+'">'+nm+'<\/td>'+
+      '<td style="color:var(--muted)">'+(r.farmCode||'—')+'<\/td>'+
       '<td><span class="tag '+tc+'">'+r.typeRM+'<\/span><\/td>'+
       '<td><span class="tag '+sc+'">'+(r.species||'—')+'<\/span><\/td>'+
       '<td style="text-align:right">'+(r.size||'—')+'<\/td>'+
