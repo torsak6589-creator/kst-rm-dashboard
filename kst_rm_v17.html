@@ -593,6 +593,7 @@ const CFG2 = {
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   sheetPlan:    'PLAN_DAILY',
+  sheetPlanMonth:'PLAN_MONTH',
   sheetActual:  'ACTUAL_TRACKING',
   sheetPrice:   'ราคา  RM คิดขาย',
   sheetReceive: 'RM-RECIVE',
@@ -856,6 +857,7 @@ function _receiveToRM(arr){
 let rawRM = _receiveToRM(typeof STATIC_RECEIVE!=='undefined'?STATIC_RECEIVE:[]);
 let filteredRM=[];
 let planData=STATIC_PLAN||[];
+let planMonthData=[];   /* PLAN_MONTH (Budget รายเดือน) — ดึง live ตอน login: [{species, live, m:[ม.ค..ธ.ค.]}] */
 let actualData=STATIC_ACTUAL||[];
 let charts={};
 
@@ -992,6 +994,18 @@ async function loadAll(){
           console.log('[KST] ✅ Live ACTUAL_TRACKING:',newA.length,'records, YTD',newA.reduce((s,x)=>s+(x.actVol||0),0).toLocaleString());
         }
     }catch(e){ _dqRaw.actualErr=e.message; console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
+
+    // ── PLAN_MONTH (Budget ปริมาณรายเดือน) — ใช้เป็นฐานเป้าหมายด้านปริมาณ ──
+    setLB(82);
+    try{
+      const pmRows = await fetchSheet(CFG2, CFG2.sheetPlanMonth);
+      _dqRaw.planMonth = pmRows;
+      const parsed = _parsePlanMonth(pmRows);
+      if(parsed.length>0){
+        planMonthData = parsed;
+        console.log('[KST] ✅ Live PLAN_MONTH:',parsed.length,'rows | YTD plan',parsed.reduce((s,r)=>s+r.m.reduce((a,b)=>a+b,0),0).toLocaleString());
+      }
+    }catch(e){ _dqRaw.planMonthErr=e.message; console.warn('[KST] PLAN_MONTH fallback:', e.message); }
 
     // ── ราคา RM คิดขาย ──
     setLB(85);
@@ -1987,6 +2001,62 @@ function _toISO(d){
   if(m){const mo=_TH_MON_ABBR[m[2]]; if(mo){const yr=parseInt(m[3],10)-543; return yr+'-'+mo+'-'+String(m[1]).padStart(2,'0');}}
   return '';
 }
+/* แปลง sheet PLAN_MONTH (matrix: แถว=ประเภท/ชนิด, คอลัมน์=ม.ค.–ธ.ค.) → [{species,live,m:[12]}] */
+const _TH_MON_HDR={'ม.ค.':1,'ก.พ.':2,'มี.ค.':3,'เม.ย.':4,'พ.ค.':5,'มิ.ย.':6,'ก.ค.':7,'ส.ค.':8,'ก.ย.':9,'ต.ค.':10,'พ.ย.':11,'ธ.ค.':12,
+  'มกราคม':1,'กุมภาพันธ์':2,'มีนาคม':3,'เมษายน':4,'พฤษภาคม':5,'มิถุนายน':6,'กรกฎาคม':7,'สิงหาคม':8,'กันยายน':9,'ตุลาคม':10,'พฤศจิกายน':11,'ธันวาคม':12};
+function _parsePlanMonth(rows){
+  if(!rows||!rows.length) return [];
+  let hi=-1, monthCol={};
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const r=rows[i]||[]; const mc={}; let cnt=0;
+    r.forEach((c,ci)=>{ const k=String(c||'').trim().replace(/\s/g,''); if(_TH_MON_HDR[k]!==undefined){mc[_TH_MON_HDR[k]]=ci;cnt++;} });
+    if(cnt>=6){hi=i;monthCol=mc;break;}
+  }
+  if(hi<0) return [];
+  const firstMonCol=Math.min.apply(null,Object.keys(monthCol).map(k=>monthCol[k]));
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const lab=[]; for(let c=0;c<firstMonCol;c++){ if(r[c]!=null&&String(r[c]).trim()) lab.push(String(r[c]).trim()); }
+    const L=lab.join(' '); if(!L) continue;
+    if(/รวมทั้งปี|grand\s*total|รวมทั้งหมด/i.test(L)) continue;
+    const species=/ขาว|FW|vanna|white|ไวท/i.test(L)?'กุ้งขาว':/ดำ|กุลา|BT|black|tiger/i.test(L)?'กุ้งกุลาดำ':'';
+    const live=/มีชีวิต|จับเป็น|เป็น|live/i.test(L)?true:/สด|broker|ดอง|fresh/i.test(L)?false:null;
+    if(live===null) continue;   // ข้ามแถวผลรวมหมวด (ไม่ระบุ สด/มีชีวิต) กันนับซ้ำ
+    const m=[]; let sum=0;
+    for(let mo=1;mo<=12;mo++){ const ci=monthCol[mo]; let v=0; if(ci!=null) v=parseFloat(String(r[ci]||'').replace(/[, ]/g,''))||0; m.push(v>0?v:0); sum+=m[mo-1]; }
+    if(sum<=0) continue;
+    out.push({species,live,m});
+  }
+  return out;
+}
+function _pmTypeMatch(r,ty){
+  if(!ty||ty==='all') return true;
+  const f=_normalizeType(ty);
+  if(/เป็น|มีชีวิต|live/i.test(f)) return r.live===true;
+  if(/ดอง|สด|broker/i.test(f))    return r.live===false;
+  return true;
+}
+/* เป้าหมายปริมาณจาก PLAN_MONTH เฉลี่ยตามจำนวนวันในช่วงที่เลือก (prorate) */
+function _planMonthVol(fr,to,ty,sp){
+  if(!planMonthData.length) return null;
+  const rows=planMonthData.filter(r=> _pmTypeMatch(r,ty) && (!sp||sp==='all'||(r.species&&_matchSpecies(r.species,sp))) );
+  if(!rows.length) return 0;
+  const Y=parseInt(String(to||fr||'2026').slice(0,4),10)||2026;
+  let total=0;
+  for(let mo=1;mo<=12;mo++){
+    let mv=0; rows.forEach(r=>mv+=(+r.m[mo-1]||0));
+    if(mv<=0) continue;
+    const dim=new Date(Y,mo,0).getDate();
+    const mStart=Date.UTC(Y,mo-1,1), mEnd=Date.UTC(Y,mo-1,dim);
+    const rs=fr?Date.parse(fr+'T00:00:00Z'):mStart, re=to?Date.parse(to+'T00:00:00Z'):mEnd;
+    const ovS=Math.max(mStart,rs), ovE=Math.min(mEnd,re);
+    if(ovE<ovS) continue;
+    const days=Math.round((ovE-ovS)/86400000)+1;
+    total+=mv*days/dim;
+  }
+  return total;
+}
 function _renderTab6(){
   // ── อ่านค่าจาก filter bar (วัน/ช่วงเวลา + ประเภท + ชนิด) ──
   const _v=id=>{const e=document.getElementById(id);return e?e.value:'';};
@@ -2026,7 +2096,11 @@ function _renderTab6(){
   const volDeltaPct=prevVol?((totVol-prevVol)/prevVol*100):null;
 
   // ══ แท็บ 3: เทียบแผน (ปริมาณ/ราคา/ขนาด) ══
-  const totPlanVol=planF.reduce((s,r)=>s+(+r[2]||0),0);
+  // ปริมาณ: ใช้ PLAN_MONTH (เฉลี่ยตามจำนวนวันในช่วง) ถ้ามี — ไม่งั้น fallback PLAN_DAILY
+  const _pmVol=_planMonthVol(fr,to,ty,sp);
+  let totPlanVol, planVolSrc;
+  if(_pmVol!=null && _pmVol>0){ totPlanVol=_pmVol; planVolSrc='PLAN_MONTH'; }
+  else { totPlanVol=planF.reduce((s,r)=>s+(+r[2]||0),0); planVolSrc='PLAN_DAILY'; }
   const hasPlanVol=totPlanVol>0;
   const volPct=hasPlanVol?totVol/totPlanVol*100:0;
   let pPlanW=0,pPlanWP=0; planF.forEach(r=>{const w=+r[2]||0,p=+r[5]||0; if(w>0&&p>0){pPlanW+=w;pPlanWP+=w*p;}});
@@ -2103,7 +2177,7 @@ function _renderTab6(){
   const _num=(v,d)=>v.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
   // dir: 'high'=มากดี, 'low'=น้อยดี, null=กลาง
   const rows=[
-    {m:'ปริมาณรับซื้อ',  u:'กก.',    ref:'KPI (t3)',   target:hasPlanVol?totPlanVol:null, act:totVol, d:0, st:stVol, dir:'high'},
+    {m:'ปริมาณรับซื้อ',  u:'กก.',    ref:planVolSrc,   target:hasPlanVol?totPlanVol:null, act:totVol, d:0, st:stVol, dir:'high'},
     {m:'มูลค่าซื้อ',     u:'฿',      ref:'สรุปซื้อ (t1)', target:null,                      act:totVal, d:0, st:null,  dir:null},
     {m:'ราคาถัวเฉลี่ย',  u:'฿/กก.',  ref:'สรุปซื้อ (t1)', target:hasPlanPrice?planPrice:null,act:blended,d:2, st:stPrice,dir:'low'},
     {m:'ราคากุ้งเป็น vs คาดการณ์ (มีชีวิต)', u:'฿/กก.', ref:'เทียบราคา (t5)', target:stFcLive.has?liveG.fc:null,  act:liveG.act,  d:2, st:liveG.vol>0?stFcLive:null,  dir:'low', skip:liveG.vol<=0},
@@ -2151,9 +2225,9 @@ function _renderTab6(){
       +(volDeltaPct!=null?' — ปริมาณ'+(volDeltaPct>=0?'<b style="color:var(--green)">เพิ่มขึ้น ':'<b style="color:var(--red)">ลดลง ')+Math.abs(volDeltaPct).toFixed(1)+'%</b> เทียบช่วงก่อนหน้า':'')+'.</p>';
   // แท็บ 3
   html+='<p><b>🎯 ผลเทียบแผน KPI (แท็บ 3):</b> '+(hasPlanVol
-      ? 'ปริมาณรับซื้อคิดเป็น <b>'+volPct.toFixed(1)+'%</b> ของแผน ('+f0(totPlanVol)+' กก.) — <b style="color:'+_stc(stVol)+'">'+stVol.l+'</b> '
+      ? 'ปริมาณรับซื้อคิดเป็น <b>'+volPct.toFixed(1)+'%</b> ของแผน ('+f0(totPlanVol)+' กก. · ที่มา '+planVolSrc+(planVolSrc==='PLAN_MONTH'?' เฉลี่ยตามจำนวนวัน':'')+') — <b style="color:'+_stc(stVol)+'">'+stVol.l+'</b> '
         +(totVol>=totPlanVol?'สูงกว่าแผน '+f0(totVol-totPlanVol)+' กก.':'ยังขาดอีก '+f0(totPlanVol-totVol)+' กก.')
-      : 'ไม่มีแผนรับซื้อ (PLAN_DAILY) ในช่วงเวลาที่เลือก จึงเทียบ KPI ไม่ได้')+'.</p>';
+      : 'ไม่มีข้อมูลแผนปริมาณ (PLAN_MONTH/PLAN_DAILY) ในช่วงเวลาที่เลือก จึงเทียบ KPI ไม่ได้')+'.</p>';
   // แท็บ 4–5 (แยกกุ้งเป็น/มีชีวิต กับ กุ้งสด/Broker ตามฐานราคาคาดการณ์)
   const _fcLine=(name,g,st)=>{
     if(!(g.vol>0)) return '';
