@@ -190,15 +190,33 @@ function _renderTab6(){
   const pricePct=hasPlanPrice?blended/planPrice*100:0;
   const sizeDev=hasPlanSize?Math.abs(actSize-planSize)/planSize*100:0;
 
-  // ══ แท็บ 4–5: ราคาจริง vs ราคาคาดการณ์ (forecast) ══
-  let fcW=0,fcWP=0;
-  if(typeof _getForecastPrice==='function'){
-    actF.forEach(r=>{ if(r.weight>0&&r.size>0){ const fc=_getForecastPrice(r.size,r.species,r.typeRM,(r.date||'').slice(0,7)); if(fc&&fc.price){fcW+=r.weight;fcWP+=fc.price*r.weight;} } });
-  }
-  const fcPrice=fcW?fcWP/fcW:0;
+  // ══ แท็บ 4–5: ราคาจริง vs ราคาคาดการณ์ — แยก กุ้งเป็น(มีชีวิต) / กุ้งสด(broker) ══
+  // ราคาคาดการณ์: คอลัมน์ "มีชีวิต" = ราคากุ้งเป็น | คอลัมน์ "สด" = ราคากุ้ง Broker (ฐานคำนวณราคา)
+  const _grpPrice=rows=>{
+    let aw=0,av=0,fw=0,fv=0,vol=0;
+    rows.forEach(r=>{ const w=r.weight||0; if(w<=0) return; vol+=w;
+      if(r.price>0){aw+=w;av+=w*r.price;}
+      if(r.size>0&&typeof _getForecastPrice==='function'){ const fc=_getForecastPrice(r.size,r.species,r.typeRM,(r.date||'').slice(0,7)); if(fc&&fc.price){fw+=w;fv+=w*fc.price;} } });
+    return {vol, act:aw?av/aw:0, fc:fw?fv/fw:0};
+  };
+  const _isLiveRow=r=>(r.typeRM||'').includes('เป็น');   // กุ้งจับเป็น/เป็นต้ม/เป็นดิบ = กุ้งเป็น
+  const liveG =_grpPrice(actF.filter(_isLiveRow));        // กุ้งเป็น → ราคาคาดการณ์ "มีชีวิต"
+  const freshG=_grpPrice(actF.filter(r=>!_isLiveRow(r))); // กุ้งสด(Broker) → ราคาคาดการณ์ "สด"
+  const allG  =_grpPrice(actF);
+  const fcPrice=allG.fc;
   const hasFc=fcPrice>0&&blended>0;
   const fcDiff=blended-fcPrice;                 // ลบ = ซื้อถูกกว่าคาดการณ์ (ดี)
   const fcPct=hasFc?blended/fcPrice*100:0;
+  // สถานะเทียบคาดการณ์ (ใช้ร่วมกันทั้งภาพรวมและแยกกลุ่ม)
+  const _stFc=(act,fc)=>{
+    if(!(fc>0&&act>0)) return {l:'— ไม่มีคาดการณ์',c:'kb-amber',conform:0,has:false};
+    const pct=act/fc*100;
+    if(act<=fc)      return {l:'✓ ต่ำกว่าคาดการณ์',c:'kb-green',conform:100,has:true};
+    if(act<=fc*1.03) return {l:'~ ใกล้เคียงคาดการณ์',c:'kb-amber',conform:Math.max(0,100-(pct-100)),has:true};
+    return {l:'✗ สูงกว่าคาดการณ์',c:'kb-red',conform:Math.max(0,100-(pct-100)),has:true};
+  };
+  const stFcLive =_stFc(liveG.act, liveG.fc);
+  const stFcFresh=_stFc(freshG.act,freshG.fc);
 
   // ══ สถานะแต่ละมิติ ══
   let stVol;
@@ -221,11 +239,7 @@ function _renderTab6(){
     else if(sizeDev<=15) stSize={l:'~ ใกล้เคียงแผน',c:'kb-amber'};
     else                 stSize={l:'✗ เบี่ยงเบนจากแผน',c:'kb-red'};}
 
-  let stFc, fcConform;
-  if(!hasFc)                    {stFc={l:'— ไม่มีราคาคาดการณ์',c:'kb-amber'}; fcConform=0;}
-  else if(blended<=fcPrice)     {stFc={l:'✓ ต่ำกว่าคาดการณ์',c:'kb-green'};  fcConform=100;}
-  else if(blended<=fcPrice*1.03){stFc={l:'~ ใกล้เคียงคาดการณ์',c:'kb-amber'};fcConform=Math.max(0,100-(fcPct-100));}
-  else                          {stFc={l:'✗ สูงกว่าคาดการณ์',c:'kb-red'};   fcConform=Math.max(0,100-(fcPct-100));}
+  const stFc=_stFc(blended,fcPrice);   // ภาพรวม (สำหรับการ์ด)
 
   // ══ KPI cards ══
   _s('an-vol', _fK(totVol)+' กก.');
@@ -245,9 +259,10 @@ function _renderTab6(){
     {m:'ปริมาณรับซื้อ',  u:'กก.',    ref:'KPI (t3)',   target:hasPlanVol?totPlanVol:null, act:totVol, d:0, st:stVol, dir:'high'},
     {m:'มูลค่าซื้อ',     u:'฿',      ref:'สรุปซื้อ (t1)', target:null,                      act:totVal, d:0, st:null,  dir:null},
     {m:'ราคาถัวเฉลี่ย',  u:'฿/กก.',  ref:'สรุปซื้อ (t1)', target:hasPlanPrice?planPrice:null,act:blended,d:2, st:stPrice,dir:'low'},
-    {m:'ราคา vs คาดการณ์',u:'฿/กก.', ref:'เทียบราคา (t5)',target:hasFc?fcPrice:null,        act:blended,d:2, st:stFc,  dir:'low'},
+    {m:'ราคากุ้งเป็น vs คาดการณ์ (มีชีวิต)', u:'฿/กก.', ref:'เทียบราคา (t5)', target:stFcLive.has?liveG.fc:null,  act:liveG.act,  d:2, st:liveG.vol>0?stFcLive:null,  dir:'low', skip:liveG.vol<=0},
+    {m:'ราคากุ้งสด vs คาดการณ์ (Broker)',    u:'฿/กก.', ref:'เทียบราคา (t5)', target:stFcFresh.has?freshG.fc:null,act:freshG.act, d:2, st:freshG.vol>0?stFcFresh:null,dir:'low', skip:freshG.vol<=0},
     {m:'ขนาดเฉลี่ย',     u:'ตัว/กก.',ref:'สรุปซื้อ (t1)', target:hasPlanSize?planSize:null, act:actSize,d:1, st:stSize, dir:null}
-  ];
+  ].filter(r=>!r.skip);
   document.getElementById('anBody').innerHTML=rows.map(r=>{
     const hasT=r.target!=null;
     const diff=hasT?r.act-r.target:null;
@@ -265,10 +280,13 @@ function _renderTab6(){
   }).join('');
 
   // ══ กราฟความสอดคล้อง (แนวนอน) ══
-  const conform=[hasPlanVol?Math.min(volPct,200):0, priceConform, sizeConform, fcConform];
+  const cLabels=['ปริมาณ (แผน)','ราคา (แผน)','ขนาด (แผน)'];
+  const conform=[hasPlanVol?Math.min(volPct,200):0, priceConform, sizeConform];
+  if(liveG.vol>0){cLabels.push('ราคากุ้งเป็น (คาดการณ์)');conform.push(stFcLive.conform);}
+  if(freshG.vol>0){cLabels.push('ราคากุ้งสด (คาดการณ์)');conform.push(stFcFresh.conform);}
   const cc=conform.map(v=>v>=95?'rgba(0,200,151,.75)':v>=80?'rgba(255,184,0,.75)':'rgba(255,71,87,.75)');
   _rb('cAnConform','anConform',{type:'bar',
-    data:{labels:['ปริมาณ (แผน)','ราคา (แผน)','ขนาด (แผน)','ราคา (คาดการณ์)'],datasets:[{data:conform,backgroundColor:cc,borderRadius:4}]},
+    data:{labels:cLabels,datasets:[{data:conform,backgroundColor:cc,borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x.toFixed(1)+'% เทียบเป้า'}}},
       scales:{x:{suggestedMax:120,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+'%',color:'#7A8CA3',font:{size:9}}},
@@ -289,13 +307,19 @@ function _renderTab6(){
       ? 'ปริมาณรับซื้อคิดเป็น <b>'+volPct.toFixed(1)+'%</b> ของแผน ('+f0(totPlanVol)+' กก.) — <b style="color:'+_stc(stVol)+'">'+stVol.l+'</b> '
         +(totVol>=totPlanVol?'สูงกว่าแผน '+f0(totVol-totPlanVol)+' กก.':'ยังขาดอีก '+f0(totPlanVol-totVol)+' กก.')
       : 'ไม่มีแผนรับซื้อ (PLAN_DAILY) ในช่วงเวลาที่เลือก จึงเทียบ KPI ไม่ได้')+'.</p>';
-  // แท็บ 4–5
-  html+='<p><b>💲 ราคาเทียบคาดการณ์ (แท็บ 4–5):</b> '+(hasFc
-      ? 'ราคาซื้อจริง <b>฿'+blended.toFixed(2)+'/กก.</b> เทียบราคาคาดการณ์ <b>฿'+fcPrice.toFixed(2)+'/กก.</b> '
-        +(fcDiff<=0?'<b style="color:var(--green)">ต่ำกว่าคาดการณ์ ฿'+Math.abs(fcDiff).toFixed(2)+'/กก.</b> ถือว่าซื้อได้คุ้มค่า'
-                   :'<b style="color:var(--red)">สูงกว่าคาดการณ์ ฿'+fcDiff.toFixed(2)+'/กก.</b> ('+(fcPct-100).toFixed(1)+'%)')
-      : 'ไม่มีราคาคาดการณ์เทียบได้ในช่วงนี้')
-      +(hasPlanPrice?' และเทียบราคาตามแผน <b>฿'+planPrice.toFixed(2)+'/กก.</b> ('+(blended<=planPrice?'ตามแผน':'สูงกว่าแผน '+(pricePct-100).toFixed(1)+'%')+')':'')+'.</p>';
+  // แท็บ 4–5 (แยกกุ้งเป็น/มีชีวิต กับ กุ้งสด/Broker ตามฐานราคาคาดการณ์)
+  const _fcLine=(name,g,st)=>{
+    if(!(g.vol>0)) return '';
+    if(!st.has) return '<b>'+name+':</b> ฿'+g.act.toFixed(2)+'/กก. (ไม่มีราคาคาดการณ์เทียบ)';
+    const diff=g.act-g.fc;
+    return '<b>'+name+':</b> จริง ฿'+g.act.toFixed(2)+' เทียบคาดการณ์ ฿'+g.fc.toFixed(2)+'/กก. — '
+      +(diff<=0?'<b style="color:var(--green)">ต่ำกว่าคาดการณ์ ฿'+Math.abs(diff).toFixed(2)+'</b> (คุ้มค่า)'
+               :'<b style="color:var(--red)">สูงกว่าคาดการณ์ ฿'+diff.toFixed(2)+'</b> ('+(g.act/g.fc*100-100).toFixed(1)+'%)');
+  };
+  const fcLines=[_fcLine('กุ้งเป็น (ฐานราคามีชีวิต)',liveG,stFcLive),_fcLine('กุ้งสด/Broker (ฐานราคาสด)',freshG,stFcFresh)].filter(Boolean);
+  html+='<p><b>💲 ราคาเทียบคาดการณ์ (แท็บ 4–5):</b> '
+      +(fcLines.length?'<br>&nbsp;&nbsp;• '+fcLines.join('<br>&nbsp;&nbsp;• '):'ไม่มีราคาคาดการณ์เทียบได้ในช่วงนี้')
+      +(hasPlanPrice?'<br>เทียบราคาตามแผนรวม ฿'+planPrice.toFixed(2)+'/กก. ('+(blended<=planPrice?'ตามแผน':'สูงกว่าแผน '+(pricePct-100).toFixed(1)+'%')+')':'')+'.</p>';
   // ขนาด
   html+='<p><b>📏 ขนาดเฉลี่ย:</b> '+(hasPlanSize
       ? 'รับเข้าจริง <b>'+actSize.toFixed(1)+' ตัว/กก.</b> เทียบแผน <b>'+planSize.toFixed(1)+' ตัว/กก.</b> เบี่ยงเบน <b>'+sizeDev.toFixed(1)+'%</b> — '+stSize.l
@@ -305,18 +329,12 @@ function _renderTab6(){
   const recs=[];
   if(hasPlanVol && volPct<95) recs.push('เร่งจัดหาวัตถุดิบเพิ่มให้ทันเป้าหมายปริมาณที่วางไว้');
   if(hasPlanPrice && blended>planPrice) recs.push('ทบทวนแหล่งรับซื้อ/ต่อรองราคา เพื่อดึงราคาเฉลี่ยกลับเข้ากรอบแผน');
-  if(hasFc && fcDiff>0) recs.push('ราคาซื้อสูงกว่าราคาคาดการณ์ — พิจารณาจังหวะ/แหล่งซื้อเพื่อลดต้นทุน');
+  if(stFcLive.has && liveG.act>liveG.fc) recs.push('ราคากุ้งเป็นสูงกว่าราคาคาดการณ์ (ฐานมีชีวิต) — พิจารณาจังหวะ/แหล่งซื้อกุ้งจับเป็น');
+  if(stFcFresh.has && freshG.act>freshG.fc) recs.push('ราคากุ้งสด/Broker สูงกว่าราคาคาดการณ์ (ฐานสด) — ทบทวนการต่อรองกับ Broker');
   if(hasPlanSize && sizeDev>15) recs.push('ปรับเกณฑ์คัดขนาดให้สอดคล้องกับแผน เพื่อคุมคุณภาพและมูลค่าผลผลิต');
   if(!recs.length) recs.push('ผลการดำเนินงานสอดคล้องกับแผน/คาดการณ์ในภาพรวม — รักษามาตรฐานนี้ต่อไป');
   html+='<p style="margin-top:6px;padding-top:10px;border-top:1px solid var(--border)"><b>🎯 ข้อเสนอแนะ:</b><br>• '+recs.join('<br>• ')+'</p>';
   document.getElementById('anText').innerHTML=html;
 }
-(function(){
-  const pds=planData.map(r=>_toISO(r[0])).filter(Boolean).sort();
-  const ds=(pds.length?pds:rawRM.map(r=>r.date).sort());
-  document.getElementById("fFrom").value=ds[0];
-  document.getElementById("fTo").value=ds[ds.length-1];
-  ["fFrom","fTo","fType","fSpecies"].forEach(id=>document.getElementById(id).addEventListener("change",_renderTab6));
-  _renderTab6();
-})();
+(function(){const pds=planData.map(r=>_toISO(r[0])).filter(Boolean).sort();const ds=(pds.length?pds:rawRM.map(r=>r.date).sort());document.getElementById("fFrom").value=ds[0];document.getElementById("fTo").value=ds[ds.length-1];["fFrom","fTo","fType","fSpecies"].forEach(id=>document.getElementById(id).addEventListener("change",_renderTab6));_renderTab6();})();
 </script></body></html>
