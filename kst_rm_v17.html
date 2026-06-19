@@ -286,6 +286,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <button class="tab-btn" onclick="switchTab('t3',this)">📊 KPI Tracking</button>
   <button class="tab-btn" onclick="switchTab('t4',this)">💲 ราคาคาดการณ์</button>
   <button class="tab-btn" onclick="switchTab('t5',this)">🔍 เปรียบเทียบราคา</button>
+  <button class="tab-btn" onclick="switchTab('t6',this)">📑 บทวิเคราะห์</button>
 </div>
 
 <!-- FILTER -->
@@ -517,6 +518,36 @@ tr:hover td{background:rgba(200,152,42,.03)}
       </tr></thead>
       <tbody id="rcBody"></tbody>
     </table></div>
+  </div>
+</div>
+
+<!-- ══ TAB 6: ANALYSIS — สรุปวิเคราะห์รวมจากทั้ง 5 แท็บ ══ -->
+<div class="tab-pane" id="t6">
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi cg"><div class="kpi-lbl">⚖️ ปริมาณรับซื้อ</div><div class="kpi-val" id="an-vol">—</div><div class="kpi-sub" id="an-vol-sub">—</div></div>
+    <div class="kpi cn"><div class="kpi-lbl">💰 ราคาถัวเฉลี่ย</div><div class="kpi-val" id="an-price">—</div><div class="kpi-sub" id="an-price-sub">—</div></div>
+    <div class="kpi cc"><div class="kpi-lbl">🎯 KPI ปริมาณ vs แผน</div><div class="kpi-val" id="an-kpi">—</div><div class="kpi-sub" id="an-kpi-sub">—</div></div>
+    <div class="kpi ca"><div class="kpi-lbl">📈 ราคา vs คาดการณ์</div><div class="kpi-val" id="an-fc">—</div><div class="kpi-sub" id="an-fc-sub">—</div></div>
+  </div>
+  <div class="row2b" style="margin-bottom:14px">
+    <div class="card">
+      <div class="ct"><span class="d"></span>ความสอดคล้องกับเป้าหมาย (%)</div>
+      <div class="cs">ปริมาณ/ราคา/ขนาด เทียบแผน · ราคาเทียบคาดการณ์ (100% = ตรงเป้า)</div>
+      <div class="cw" style="height:210px"><canvas id="cAnConform"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="d"></span>สรุปตัวชี้วัดรวมจากทั้ง 5 แท็บ</div>
+      <div class="cs" style="margin-bottom:10px">ตามช่วงวันที่/เงื่อนไขที่เลือก</div>
+      <div class="tw"><table>
+        <thead><tr><th>มิติ</th><th>อ้างอิง</th><th>เป้า/คาดการณ์</th><th>จริง</th><th>ส่วนต่าง</th><th>สถานะ</th></tr></thead>
+        <tbody id="anBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct"><span class="d"></span>📝 บทวิเคราะห์ภาพรวม (สังเคราะห์จากแท็บ 1–5)</div>
+    <div class="cs" id="an-period">—</div>
+    <div id="anText" style="font-size:12px;line-height:1.9;color:var(--text)"></div>
   </div>
 </div>
 
@@ -1180,6 +1211,7 @@ function applyFilter(){
   const f2=d=>d?new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}):'?';
   document.getElementById('hdrPeriod').textContent=f2(fr)+' — '+f2(to)+' | Branch KH';
   _renderTab1();_renderTab2(fr,to,ty,sp);_renderTab3(ty,sp);
+  try{_renderTab6();}catch(e){console.warn('[KST] Tab6:',e.message);}
 }
 function resetFilter(){
   if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const l=new Date(dates[dates.length-1]);const f=new Date(l);f.setDate(f.getDate()-29);document.getElementById('fFrom').value=_fmt(f);document.getElementById('fTo').value=_fmt(l);}
@@ -1945,6 +1977,188 @@ function _renderTab4(){
 }
 
 /* ══════ TAB SWITCH ══════ */
+/* ══════ TAB 6: บทวิเคราะห์ / สรุปเทียบแผน ══════ */
+/* แปลงวันที่ให้เป็นรูปแบบ ISO (YYYY-MM-DD) — รองรับทั้ง ISO และไทย เช่น "14 พ.ค. 2569" */
+const _TH_MON_ABBR={'ม.ค.':'01','ก.พ.':'02','มี.ค.':'03','เม.ย.':'04','พ.ค.':'05','มิ.ย.':'06','ก.ค.':'07','ส.ค.':'08','ก.ย.':'09','ต.ค.':'10','พ.ย.':'11','ธ.ค.':'12'};
+function _toISO(d){
+  d=String(d||'').trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0,10);
+  const m=d.match(/^(\d{1,2})\s+([ก-๙.]+)\s+(\d{4})$/);
+  if(m){const mo=_TH_MON_ABBR[m[2]]; if(mo){const yr=parseInt(m[3],10)-543; return yr+'-'+mo+'-'+String(m[1]).padStart(2,'0');}}
+  return '';
+}
+function _renderTab6(){
+  // ── อ่านค่าจาก filter bar (วัน/ช่วงเวลา + ประเภท + ชนิด) ──
+  const _v=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const fr=_v('fFrom'), to=_v('fTo'), ty=_v('fType')||'all', sp=_v('fSpecies')||'all';
+  const _inRange=d=>{const x=_toISO(d); if(!x) return false; if(fr&&x<fr) return false; if(to&&x>to) return false; return true;};
+  const _stc=s=>s.c==='kb-green'?'var(--green)':s.c==='kb-red'?'var(--red)':'var(--amber)';
+  const f0=v=>v.toLocaleString(undefined,{maximumFractionDigits:0});
+
+  // ── ACTUAL (แท็บ 1–2): ใช้ filteredRM ให้ตรงกับที่แสดงในแท็บอื่น ──
+  const actF=(typeof filteredRM!=='undefined'&&Array.isArray(filteredRM)&&filteredRM.length)
+    ? filteredRM
+    : rawRM.filter(r=>_inRange(r.date)&&_matchType(r.typeRM,ty)&&_matchSpecies(r.species,sp));
+  // ── PLAN (แท็บ 3): PLAN_DAILY [date,supplier,weight,size,typeRM,price,species] ──
+  const planF=planData.filter(r=>_inRange(r[0])&&_matchType(_normalizeType(r[4]||''),ty)&&_matchSpecies(r[6]||'',sp));
+
+  // กรณีไม่มีข้อมูลในช่วงที่เลือก
+  if(!actF.length && !planF.length){
+    ['an-vol','an-price','an-kpi','an-fc'].forEach(id=>_s(id,'—'));
+    ['an-vol-sub','an-price-sub','an-kpi-sub','an-fc-sub'].forEach(id=>_s(id,'ไม่มีข้อมูล'));
+    document.getElementById('anBody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">ไม่มีข้อมูลในช่วงเวลา/เงื่อนไขที่เลือก<\/td><\/tr>';
+    document.getElementById('an-period').textContent='ช่วง '+(fr||'เริ่มต้น')+' – '+(to||'ล่าสุด');
+    document.getElementById('anText').innerHTML='<p style="color:var(--muted)">ปรับช่วงวันที่หรือเงื่อนไขในแถบกรองด้านบนเพื่อดูบทวิเคราะห์</p>';
+    if(charts.anConform){charts.anConform.destroy();delete charts.anConform;}
+    return;
+  }
+
+  // ══ แท็บ 1: ปริมาณ/มูลค่า/ราคาถัวเฉลี่ย/ผู้ขาย/สัดส่วนประเภท/ขนาด ══
+  const totVol=actF.reduce((s,r)=>s+(r.weight||0),0);
+  const totVal=actF.reduce((s,r)=>s+(r.value||0),0);
+  const blended=totVol?totVal/totVol:0;
+  const nSup=new Set(actF.map(r=>r.supplier)).size, nRec=actF.length;
+  let liveW=0,dongW=0; actF.forEach(r=>{ (r.typeRM||'').includes('เป็น')?liveW+=r.weight:dongW+=r.weight; });
+  const livePct=totVol?liveW/totVol*100:0, dongPct=totVol?dongW/totVol*100:0;
+  let szAW=0,szAWS=0; actF.forEach(r=>{ if(r.weight>0&&r.size>0){szAW+=r.weight;szAWS+=r.weight*r.size;} });
+  const actSize=szAW?szAWS/szAW:0;
+  let prevVol=0; try{const pr=_prevRM(); if(pr) prevVol=pr[0];}catch(_){}
+  const volDeltaPct=prevVol?((totVol-prevVol)/prevVol*100):null;
+
+  // ══ แท็บ 3: เทียบแผน (ปริมาณ/ราคา/ขนาด) ══
+  const totPlanVol=planF.reduce((s,r)=>s+(+r[2]||0),0);
+  const hasPlanVol=totPlanVol>0;
+  const volPct=hasPlanVol?totVol/totPlanVol*100:0;
+  let pPlanW=0,pPlanWP=0; planF.forEach(r=>{const w=+r[2]||0,p=+r[5]||0; if(w>0&&p>0){pPlanW+=w;pPlanWP+=w*p;}});
+  const planPrice=pPlanW?pPlanWP/pPlanW:0;
+  let szPlanW=0,szPlanWS=0; planF.forEach(r=>{const w=+r[2]||0,s=+r[3]||0; if(w>0&&s>0){szPlanW+=w;szPlanWS+=w*s;}});
+  const planSize=szPlanW?szPlanWS/szPlanW:0;
+  const hasPlanPrice=planPrice>0&&blended>0, hasPlanSize=planSize>0&&actSize>0;
+  const pricePct=hasPlanPrice?blended/planPrice*100:0;
+  const sizeDev=hasPlanSize?Math.abs(actSize-planSize)/planSize*100:0;
+
+  // ══ แท็บ 4–5: ราคาจริง vs ราคาคาดการณ์ (forecast) ══
+  let fcW=0,fcWP=0;
+  if(typeof _getForecastPrice==='function'){
+    actF.forEach(r=>{ if(r.weight>0&&r.size>0){ const fc=_getForecastPrice(r.size,r.species,r.typeRM,(r.date||'').slice(0,7)); if(fc&&fc.price){fcW+=r.weight;fcWP+=fc.price*r.weight;} } });
+  }
+  const fcPrice=fcW?fcWP/fcW:0;
+  const hasFc=fcPrice>0&&blended>0;
+  const fcDiff=blended-fcPrice;                 // ลบ = ซื้อถูกกว่าคาดการณ์ (ดี)
+  const fcPct=hasFc?blended/fcPrice*100:0;
+
+  // ══ สถานะแต่ละมิติ ══
+  let stVol;
+  if(!hasPlanVol)               stVol={l:'— ไม่มีแผน',c:'kb-amber'};
+  else if(volPct>=95&&volPct<=110) stVol={l:'✓ ตรงตามแผน',c:'kb-green'};
+  else if(volPct>110)           stVol={l:'▲ สูงกว่าแผน',c:'kb-amber'};
+  else if(volPct>=80)           stVol={l:'~ ใกล้เคียงแผน',c:'kb-amber'};
+  else                          stVol={l:'✗ ต่ำกว่าแผน',c:'kb-red'};
+
+  let stPrice, priceConform;
+  if(!hasPlanPrice)                {stPrice={l:'— ไม่มีแผนราคา',c:'kb-amber'}; priceConform=0;}
+  else if(blended<=planPrice)      {stPrice={l:'✓ ดีกว่า/ตามแผน',c:'kb-green'}; priceConform=100;}
+  else if(blended<=planPrice*1.05) {stPrice={l:'~ ใกล้เคียงแผน',c:'kb-amber'};  priceConform=Math.max(0,100-(pricePct-100));}
+  else                             {stPrice={l:'✗ สูงกว่าแผน',c:'kb-red'};      priceConform=Math.max(0,100-(pricePct-100));}
+
+  let stSize, sizeConform;
+  if(!hasPlanSize)     {stSize={l:'— ไม่มีแผนขนาด',c:'kb-amber'}; sizeConform=0;}
+  else {sizeConform=Math.max(0,100-sizeDev);
+    if(sizeDev<=5)       stSize={l:'✓ ตรงตามแผน',c:'kb-green'};
+    else if(sizeDev<=15) stSize={l:'~ ใกล้เคียงแผน',c:'kb-amber'};
+    else                 stSize={l:'✗ เบี่ยงเบนจากแผน',c:'kb-red'};}
+
+  let stFc, fcConform;
+  if(!hasFc)                    {stFc={l:'— ไม่มีราคาคาดการณ์',c:'kb-amber'}; fcConform=0;}
+  else if(blended<=fcPrice)     {stFc={l:'✓ ต่ำกว่าคาดการณ์',c:'kb-green'};  fcConform=100;}
+  else if(blended<=fcPrice*1.03){stFc={l:'~ ใกล้เคียงคาดการณ์',c:'kb-amber'};fcConform=Math.max(0,100-(fcPct-100));}
+  else                          {stFc={l:'✗ สูงกว่าคาดการณ์',c:'kb-red'};   fcConform=Math.max(0,100-(fcPct-100));}
+
+  // ══ KPI cards ══
+  _s('an-vol', _fK(totVol)+' กก.');
+  _s('an-vol-sub', f0(nRec)+' รายการ • '+nSup+' ผู้ขาย'+(volDeltaPct!=null?' • '+(volDeltaPct>=0?'▲ +':'▼ ')+Math.abs(volDeltaPct).toFixed(1)+'% vs ช่วงก่อน':''));
+  _s('an-price', '฿ '+blended.toFixed(2));
+  _s('an-price-sub', 'มูลค่ารวม '+_fM(totVal)+' ฿');
+  _s('an-kpi', hasPlanVol?volPct.toFixed(0)+'%':'—');
+  _s('an-kpi-sub', stVol.l);
+  _s('an-fc', hasFc?(fcDiff>=0?'+':'−')+'฿'+Math.abs(fcDiff).toFixed(1):'—');
+  _s('an-fc-sub', stFc.l);
+
+  // ══ ตารางสรุปรวมจาก 5 แท็บ ══
+  const _pc=v=>(v>=0?'+':'')+v.toLocaleString(undefined,{maximumFractionDigits:0});
+  const _num=(v,d)=>v.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+  // dir: 'high'=มากดี, 'low'=น้อยดี, null=กลาง
+  const rows=[
+    {m:'ปริมาณรับซื้อ',  u:'กก.',    ref:'KPI (t3)',   target:hasPlanVol?totPlanVol:null, act:totVol, d:0, st:stVol, dir:'high'},
+    {m:'มูลค่าซื้อ',     u:'฿',      ref:'สรุปซื้อ (t1)', target:null,                      act:totVal, d:0, st:null,  dir:null},
+    {m:'ราคาถัวเฉลี่ย',  u:'฿/กก.',  ref:'สรุปซื้อ (t1)', target:hasPlanPrice?planPrice:null,act:blended,d:2, st:stPrice,dir:'low'},
+    {m:'ราคา vs คาดการณ์',u:'฿/กก.', ref:'เทียบราคา (t5)',target:hasFc?fcPrice:null,        act:blended,d:2, st:stFc,  dir:'low'},
+    {m:'ขนาดเฉลี่ย',     u:'ตัว/กก.',ref:'สรุปซื้อ (t1)', target:hasPlanSize?planSize:null, act:actSize,d:1, st:stSize, dir:null}
+  ];
+  document.getElementById('anBody').innerHTML=rows.map(r=>{
+    const hasT=r.target!=null;
+    const diff=hasT?r.act-r.target:null;
+    let dc='var(--muted)';
+    if(hasT&&r.dir==='high') dc=diff>=0?'var(--green)':'var(--red)';
+    else if(hasT&&r.dir==='low') dc=diff<=0?'var(--green)':'var(--red)';
+    return '<tr>'+
+      '<td style="font-weight:600">'+r.m+' <span style="color:var(--muted);font-weight:400">('+r.u+')<\/span><\/td>'+
+      '<td style="color:var(--muted)">'+r.ref+'<\/td>'+
+      '<td style="text-align:right">'+(hasT?_num(r.target,r.d):'—')+'<\/td>'+
+      '<td style="text-align:right;font-weight:600">'+_num(r.act,r.d)+'<\/td>'+
+      '<td style="text-align:right;color:'+dc+'">'+(hasT?_pc(diff):'—')+'<\/td>'+
+      '<td>'+(r.st?'<span class="kpi-badge '+r.st.c+'">'+r.st.l+'<\/span>':'—')+'<\/td>'+
+    '<\/tr>';
+  }).join('');
+
+  // ══ กราฟความสอดคล้อง (แนวนอน) ══
+  const conform=[hasPlanVol?Math.min(volPct,200):0, priceConform, sizeConform, fcConform];
+  const cc=conform.map(v=>v>=95?'rgba(0,200,151,.75)':v>=80?'rgba(255,184,0,.75)':'rgba(255,71,87,.75)');
+  _rb('cAnConform','anConform',{type:'bar',
+    data:{labels:['ปริมาณ (แผน)','ราคา (แผน)','ขนาด (แผน)','ราคา (คาดการณ์)'],datasets:[{data:conform,backgroundColor:cc,borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x.toFixed(1)+'% เทียบเป้า'}}},
+      scales:{x:{suggestedMax:120,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+'%',color:'#7A8CA3',font:{size:9}}},
+              y:{grid:{display:false},ticks:{color:'#4A5568',font:{size:10,weight:'600'}}}}}});
+
+  // ══ บทวิเคราะห์ (สังเคราะห์จากแท็บ 1–5) ══
+  document.getElementById('an-period').textContent=
+    'ช่วง '+(fr||'เริ่มต้น')+' – '+(to||'ล่าสุด')+' | ประเภท: '+(ty==='all'?'ทั้งหมด':ty)+' | ชนิด: '+(sp==='all'?'ทั้งหมด':sp)
+    +' — สังเคราะห์จากแท็บ 1 (สรุปซื้อ) · 3 (KPI เทียบแผน) · 4–5 (ราคาคาดการณ์)';
+  let html='';
+  // แท็บ 1–2
+  html+='<p><b>📦 ภาพรวมการรับซื้อ (แท็บ 1–2):</b> ในช่วงที่เลือกรับซื้อรวม <b>'+f0(totVol)+' กก.</b> '
+      +'จำนวน <b>'+f0(nRec)+'</b> รายการ จากผู้ขาย <b>'+nSup+'</b> ราย มูลค่า <b>฿'+f0(totVal)+'</b> '
+      +'ราคาถัวเฉลี่ย <b>฿'+blended.toFixed(2)+'/กก.</b> แบ่งเป็นกุ้งเป็น '+livePct.toFixed(0)+'% / กุ้งดอง '+dongPct.toFixed(0)+'%'
+      +(volDeltaPct!=null?' — ปริมาณ'+(volDeltaPct>=0?'<b style="color:var(--green)">เพิ่มขึ้น ':'<b style="color:var(--red)">ลดลง ')+Math.abs(volDeltaPct).toFixed(1)+'%</b> เทียบช่วงก่อนหน้า':'')+'.</p>';
+  // แท็บ 3
+  html+='<p><b>🎯 ผลเทียบแผน KPI (แท็บ 3):</b> '+(hasPlanVol
+      ? 'ปริมาณรับซื้อคิดเป็น <b>'+volPct.toFixed(1)+'%</b> ของแผน ('+f0(totPlanVol)+' กก.) — <b style="color:'+_stc(stVol)+'">'+stVol.l+'</b> '
+        +(totVol>=totPlanVol?'สูงกว่าแผน '+f0(totVol-totPlanVol)+' กก.':'ยังขาดอีก '+f0(totPlanVol-totVol)+' กก.')
+      : 'ไม่มีแผนรับซื้อ (PLAN_DAILY) ในช่วงเวลาที่เลือก จึงเทียบ KPI ไม่ได้')+'.</p>';
+  // แท็บ 4–5
+  html+='<p><b>💲 ราคาเทียบคาดการณ์ (แท็บ 4–5):</b> '+(hasFc
+      ? 'ราคาซื้อจริง <b>฿'+blended.toFixed(2)+'/กก.</b> เทียบราคาคาดการณ์ <b>฿'+fcPrice.toFixed(2)+'/กก.</b> '
+        +(fcDiff<=0?'<b style="color:var(--green)">ต่ำกว่าคาดการณ์ ฿'+Math.abs(fcDiff).toFixed(2)+'/กก.</b> ถือว่าซื้อได้คุ้มค่า'
+                   :'<b style="color:var(--red)">สูงกว่าคาดการณ์ ฿'+fcDiff.toFixed(2)+'/กก.</b> ('+(fcPct-100).toFixed(1)+'%)')
+      : 'ไม่มีราคาคาดการณ์เทียบได้ในช่วงนี้')
+      +(hasPlanPrice?' และเทียบราคาตามแผน <b>฿'+planPrice.toFixed(2)+'/กก.</b> ('+(blended<=planPrice?'ตามแผน':'สูงกว่าแผน '+(pricePct-100).toFixed(1)+'%')+')':'')+'.</p>';
+  // ขนาด
+  html+='<p><b>📏 ขนาดเฉลี่ย:</b> '+(hasPlanSize
+      ? 'รับเข้าจริง <b>'+actSize.toFixed(1)+' ตัว/กก.</b> เทียบแผน <b>'+planSize.toFixed(1)+' ตัว/กก.</b> เบี่ยงเบน <b>'+sizeDev.toFixed(1)+'%</b> — '+stSize.l
+        +(actSize>planSize?' (กุ้งเล็กกว่าแผน ควรเน้นจัดหากุ้งตัวใหญ่)':actSize<planSize?' (กุ้งใหญ่กว่าแผน มูลค่าต่อหน่วยสูงขึ้น)':'')
+      : 'ขนาดเฉลี่ยจริง <b>'+actSize.toFixed(1)+' ตัว/กก.</b> (ไม่มีแผนขนาดเทียบในช่วงนี้)')+'.</p>';
+  // ข้อเสนอแนะ
+  const recs=[];
+  if(hasPlanVol && volPct<95) recs.push('เร่งจัดหาวัตถุดิบเพิ่มให้ทันเป้าหมายปริมาณที่วางไว้');
+  if(hasPlanPrice && blended>planPrice) recs.push('ทบทวนแหล่งรับซื้อ/ต่อรองราคา เพื่อดึงราคาเฉลี่ยกลับเข้ากรอบแผน');
+  if(hasFc && fcDiff>0) recs.push('ราคาซื้อสูงกว่าราคาคาดการณ์ — พิจารณาจังหวะ/แหล่งซื้อเพื่อลดต้นทุน');
+  if(hasPlanSize && sizeDev>15) recs.push('ปรับเกณฑ์คัดขนาดให้สอดคล้องกับแผน เพื่อคุมคุณภาพและมูลค่าผลผลิต');
+  if(!recs.length) recs.push('ผลการดำเนินงานสอดคล้องกับแผน/คาดการณ์ในภาพรวม — รักษามาตรฐานนี้ต่อไป');
+  html+='<p style="margin-top:6px;padding-top:10px;border-top:1px solid var(--border)"><b>🎯 ข้อเสนอแนะ:</b><br>• '+recs.join('<br>• ')+'</p>';
+  document.getElementById('anText').innerHTML=html;
+}
+
 function switchTab(id,btn){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -1954,6 +2168,7 @@ function switchTab(id,btn){
     Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}});
     if(id==='t4') _renderTab4();
     if(id==='t5') _renderTab5();
+    if(id==='t6') _renderTab6();
   },50);
 }
 
