@@ -286,6 +286,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
   <button class="tab-btn" onclick="switchTab('t3',this)">📊 KPI Tracking</button>
   <button class="tab-btn" onclick="switchTab('t4',this)">💲 ราคาคาดการณ์</button>
   <button class="tab-btn" onclick="switchTab('t5',this)">🔍 เปรียบเทียบราคา</button>
+  <button class="tab-btn" onclick="switchTab('t6',this)">📑 บทวิเคราะห์</button>
 </div>
 
 <!-- FILTER -->
@@ -520,6 +521,36 @@ tr:hover td{background:rgba(200,152,42,.03)}
   </div>
 </div>
 
+<!-- ══ TAB 6: ANALYSIS — สรุปวิเคราะห์รวมจากทั้ง 5 แท็บ ══ -->
+<div class="tab-pane" id="t6">
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi cg"><div class="kpi-lbl">⚖️ ปริมาณรับซื้อ</div><div class="kpi-val" id="an-vol">—</div><div class="kpi-sub" id="an-vol-sub">—</div></div>
+    <div class="kpi cn"><div class="kpi-lbl">💰 ราคาถัวเฉลี่ย</div><div class="kpi-val" id="an-price">—</div><div class="kpi-sub" id="an-price-sub">—</div></div>
+    <div class="kpi cc"><div class="kpi-lbl">🎯 KPI ปริมาณ vs แผน</div><div class="kpi-val" id="an-kpi">—</div><div class="kpi-sub" id="an-kpi-sub">—</div></div>
+    <div class="kpi ca"><div class="kpi-lbl">📈 ราคา vs คาดการณ์</div><div class="kpi-val" id="an-fc">—</div><div class="kpi-sub" id="an-fc-sub">—</div></div>
+  </div>
+  <div class="row2b" style="margin-bottom:14px">
+    <div class="card">
+      <div class="ct"><span class="d"></span>ความสอดคล้องกับเป้าหมาย (%)</div>
+      <div class="cs">ปริมาณ/ราคา/ขนาด เทียบแผน · ราคาเทียบคาดการณ์ (100% = ตรงเป้า)</div>
+      <div class="cw" style="height:210px"><canvas id="cAnConform"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="d"></span>สรุปตัวชี้วัดรวมจากทั้ง 5 แท็บ</div>
+      <div class="cs" style="margin-bottom:10px">ตามช่วงวันที่/เงื่อนไขที่เลือก</div>
+      <div class="tw"><table>
+        <thead><tr><th>มิติ</th><th>อ้างอิง</th><th>เป้า/คาดการณ์</th><th>จริง</th><th>ส่วนต่าง</th><th>สถานะ</th></tr></thead>
+        <tbody id="anBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct"><span class="d"></span>📝 บทวิเคราะห์ภาพรวม (สังเคราะห์จากแท็บ 1–5)</div>
+    <div class="cs" id="an-period">—</div>
+    <div id="anText" style="font-size:12px;line-height:1.9;color:var(--text)"></div>
+  </div>
+</div>
+
 <!-- DATA QUALITY CHECK MODAL -->
 <div id="dqOverlay" onclick="if(event.target===this)closeDQ()">
   <div class="dq-modal">
@@ -562,6 +593,7 @@ const CFG2 = {
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   sheetPlan:    'PLAN_DAILY',
+  sheetPlanMonth:'PLAN_MONTH',
   sheetActual:  'ACTUAL_TRACKING',
   sheetPrice:   'ราคา  RM คิดขาย',
   sheetReceive: 'RM-RECIVE',
@@ -825,6 +857,7 @@ function _receiveToRM(arr){
 let rawRM = _receiveToRM(typeof STATIC_RECEIVE!=='undefined'?STATIC_RECEIVE:[]);
 let filteredRM=[];
 let planData=STATIC_PLAN||[];
+let planMonthData=[];   /* PLAN_MONTH (Budget รายเดือน) — ดึง live ตอน login: [{species, live, m:[ม.ค..ธ.ค.]}] */
 let actualData=STATIC_ACTUAL||[];
 let charts={};
 
@@ -961,6 +994,18 @@ async function loadAll(){
           console.log('[KST] ✅ Live ACTUAL_TRACKING:',newA.length,'records, YTD',newA.reduce((s,x)=>s+(x.actVol||0),0).toLocaleString());
         }
     }catch(e){ _dqRaw.actualErr=e.message; console.warn('[KST] ACTUAL_TRACKING fallback:', e.message); }
+
+    // ── PLAN_MONTH (Budget ปริมาณรายเดือน) — ใช้เป็นฐานเป้าหมายด้านปริมาณ ──
+    setLB(82);
+    try{
+      const pmRows = await fetchSheet(CFG2, CFG2.sheetPlanMonth);
+      _dqRaw.planMonth = pmRows;
+      const parsed = _parsePlanMonth(pmRows);
+      if(parsed.length>0){
+        planMonthData = parsed;
+        console.log('[KST] ✅ Live PLAN_MONTH:',parsed.length,'rows | YTD plan',parsed.reduce((s,r)=>s+r.m.reduce((a,b)=>a+b,0),0).toLocaleString());
+      }
+    }catch(e){ _dqRaw.planMonthErr=e.message; console.warn('[KST] PLAN_MONTH fallback:', e.message); }
 
     // ── ราคา RM คิดขาย ──
     setLB(85);
@@ -1180,6 +1225,7 @@ function applyFilter(){
   const f2=d=>d?new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}):'?';
   document.getElementById('hdrPeriod').textContent=f2(fr)+' — '+f2(to)+' | Branch KH';
   _renderTab1();_renderTab2(fr,to,ty,sp);_renderTab3(ty,sp);
+  try{_renderTab6();}catch(e){console.warn('[KST] Tab6:',e.message);}
 }
 function resetFilter(){
   if(rawRM.length){const dates=rawRM.map(r=>r.date).sort();const l=new Date(dates[dates.length-1]);const f=new Date(l);f.setDate(f.getDate()-29);document.getElementById('fFrom').value=_fmt(f);document.getElementById('fTo').value=_fmt(l);}
@@ -1945,6 +1991,273 @@ function _renderTab4(){
 }
 
 /* ══════ TAB SWITCH ══════ */
+/* ══════ TAB 6: บทวิเคราะห์ / สรุปเทียบแผน ══════ */
+/* แปลงวันที่ให้เป็นรูปแบบ ISO (YYYY-MM-DD) — รองรับทั้ง ISO และไทย เช่น "14 พ.ค. 2569" */
+const _TH_MON_ABBR={'ม.ค.':'01','ก.พ.':'02','มี.ค.':'03','เม.ย.':'04','พ.ค.':'05','มิ.ย.':'06','ก.ค.':'07','ส.ค.':'08','ก.ย.':'09','ต.ค.':'10','พ.ย.':'11','ธ.ค.':'12'};
+function _toISO(d){
+  d=String(d||'').trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0,10);
+  const m=d.match(/^(\d{1,2})\s+([ก-๙.]+)\s+(\d{4})$/);
+  if(m){const mo=_TH_MON_ABBR[m[2]]; if(mo){const yr=parseInt(m[3],10)-543; return yr+'-'+mo+'-'+String(m[1]).padStart(2,'0');}}
+  return '';
+}
+/* แปลง sheet PLAN_MONTH (matrix: แถว=ประเภท/ชนิด, คอลัมน์=ม.ค.–ธ.ค.) → [{species,live,m:[12]}] */
+const _TH_MON_HDR={'ม.ค.':1,'ก.พ.':2,'มี.ค.':3,'เม.ย.':4,'พ.ค.':5,'มิ.ย.':6,'ก.ค.':7,'ส.ค.':8,'ก.ย.':9,'ต.ค.':10,'พ.ย.':11,'ธ.ค.':12,
+  'มกราคม':1,'กุมภาพันธ์':2,'มีนาคม':3,'เมษายน':4,'พฤษภาคม':5,'มิถุนายน':6,'กรกฎาคม':7,'สิงหาคม':8,'กันยายน':9,'ตุลาคม':10,'พฤศจิกายน':11,'ธันวาคม':12};
+function _parsePlanMonth(rows){
+  if(!rows||!rows.length) return [];
+  let hi=-1, monthCol={};
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const r=rows[i]||[]; const mc={}; let cnt=0;
+    r.forEach((c,ci)=>{ const k=String(c||'').trim().replace(/\s/g,''); if(_TH_MON_HDR[k]!==undefined){mc[_TH_MON_HDR[k]]=ci;cnt++;} });
+    if(cnt>=6){hi=i;monthCol=mc;break;}
+  }
+  if(hi<0) return [];
+  const firstMonCol=Math.min.apply(null,Object.keys(monthCol).map(k=>monthCol[k]));
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const lab=[]; for(let c=0;c<firstMonCol;c++){ if(r[c]!=null&&String(r[c]).trim()) lab.push(String(r[c]).trim()); }
+    const L=lab.join(' '); if(!L) continue;
+    if(/รวมทั้งปี|grand\s*total|รวมทั้งหมด/i.test(L)) continue;
+    const species=/ขาว|FW|vanna|white|ไวท/i.test(L)?'กุ้งขาว':/ดำ|กุลา|BT|black|tiger/i.test(L)?'กุ้งกุลาดำ':'';
+    const live=/มีชีวิต|จับเป็น|เป็น|live/i.test(L)?true:/สด|broker|ดอง|fresh/i.test(L)?false:null;
+    if(live===null) continue;   // ข้ามแถวผลรวมหมวด (ไม่ระบุ สด/มีชีวิต) กันนับซ้ำ
+    const m=[]; let sum=0;
+    for(let mo=1;mo<=12;mo++){ const ci=monthCol[mo]; let v=0; if(ci!=null) v=parseFloat(String(r[ci]||'').replace(/[, ]/g,''))||0; m.push(v>0?v:0); sum+=m[mo-1]; }
+    if(sum<=0) continue;
+    out.push({species,live,m});
+  }
+  return out;
+}
+function _pmTypeMatch(r,ty){
+  if(!ty||ty==='all') return true;
+  const f=_normalizeType(ty);
+  if(/เป็น|มีชีวิต|live/i.test(f)) return r.live===true;
+  if(/ดอง|สด|broker/i.test(f))    return r.live===false;
+  return true;
+}
+/* เป้าหมายปริมาณจาก PLAN_MONTH เฉลี่ยตามจำนวนวันในช่วงที่เลือก (prorate) */
+function _planMonthVol(fr,to,ty,sp){
+  if(!planMonthData.length) return null;
+  const rows=planMonthData.filter(r=> _pmTypeMatch(r,ty) && (!sp||sp==='all'||(r.species&&_matchSpecies(r.species,sp))) );
+  if(!rows.length) return 0;
+  const Y=parseInt(String(to||fr||'2026').slice(0,4),10)||2026;
+  let total=0;
+  for(let mo=1;mo<=12;mo++){
+    let mv=0; rows.forEach(r=>mv+=(+r.m[mo-1]||0));
+    if(mv<=0) continue;
+    const dim=new Date(Y,mo,0).getDate();
+    const mStart=Date.UTC(Y,mo-1,1), mEnd=Date.UTC(Y,mo-1,dim);
+    const rs=fr?Date.parse(fr+'T00:00:00Z'):mStart, re=to?Date.parse(to+'T00:00:00Z'):mEnd;
+    const ovS=Math.max(mStart,rs), ovE=Math.min(mEnd,re);
+    if(ovE<ovS) continue;
+    const days=Math.round((ovE-ovS)/86400000)+1;
+    total+=mv*days/dim;
+  }
+  return total;
+}
+function _renderTab6(){
+  // ── อ่านค่าจาก filter bar (วัน/ช่วงเวลา + ประเภท + ชนิด) ──
+  const _v=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const fr=_v('fFrom'), to=_v('fTo'), ty=_v('fType')||'all', sp=_v('fSpecies')||'all';
+  const _inRange=d=>{const x=_toISO(d); if(!x) return false; if(fr&&x<fr) return false; if(to&&x>to) return false; return true;};
+  const _stc=s=>s.c==='kb-green'?'var(--green)':s.c==='kb-red'?'var(--red)':'var(--amber)';
+  const f0=v=>v.toLocaleString(undefined,{maximumFractionDigits:0});
+
+  // ── ACTUAL (แท็บ 1–2): ใช้ filteredRM ให้ตรงกับที่แสดงในแท็บอื่น ──
+  const actF=(typeof filteredRM!=='undefined'&&Array.isArray(filteredRM)&&filteredRM.length)
+    ? filteredRM
+    : rawRM.filter(r=>_inRange(r.date)&&_matchType(r.typeRM,ty)&&_matchSpecies(r.species,sp));
+  // ── PLAN (แท็บ 3): PLAN_DAILY [date,supplier,weight,size,typeRM,price,species] ──
+  const planF=planData.filter(r=>_inRange(r[0])&&_matchType(_normalizeType(r[4]||''),ty)&&_matchSpecies(r[6]||'',sp));
+
+  // กรณีไม่มีข้อมูลในช่วงที่เลือก
+  if(!actF.length && !planF.length){
+    ['an-vol','an-price','an-kpi','an-fc'].forEach(id=>_s(id,'—'));
+    ['an-vol-sub','an-price-sub','an-kpi-sub','an-fc-sub'].forEach(id=>_s(id,'ไม่มีข้อมูล'));
+    document.getElementById('anBody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">ไม่มีข้อมูลในช่วงเวลา/เงื่อนไขที่เลือก<\/td><\/tr>';
+    document.getElementById('an-period').textContent='ช่วง '+(fr||'เริ่มต้น')+' – '+(to||'ล่าสุด');
+    document.getElementById('anText').innerHTML='<p style="color:var(--muted)">ปรับช่วงวันที่หรือเงื่อนไขในแถบกรองด้านบนเพื่อดูบทวิเคราะห์</p>';
+    if(charts.anConform){charts.anConform.destroy();delete charts.anConform;}
+    return;
+  }
+
+  // ══ แท็บ 1: ปริมาณ/มูลค่า/ราคาถัวเฉลี่ย/ผู้ขาย/สัดส่วนประเภท/ขนาด ══
+  const totVol=actF.reduce((s,r)=>s+(r.weight||0),0);
+  const totVal=actF.reduce((s,r)=>s+(r.value||0),0);
+  const blended=totVol?totVal/totVol:0;
+  const nSup=new Set(actF.map(r=>r.supplier)).size, nRec=actF.length;
+  let liveW=0,dongW=0; actF.forEach(r=>{ (r.typeRM||'').includes('เป็น')?liveW+=r.weight:dongW+=r.weight; });
+  const livePct=totVol?liveW/totVol*100:0, dongPct=totVol?dongW/totVol*100:0;
+  let szAW=0,szAWS=0; actF.forEach(r=>{ if(r.weight>0&&r.size>0){szAW+=r.weight;szAWS+=r.weight*r.size;} });
+  const actSize=szAW?szAWS/szAW:0;
+  let prevVol=0; try{const pr=_prevRM(); if(pr) prevVol=pr[0];}catch(_){}
+  const volDeltaPct=prevVol?((totVol-prevVol)/prevVol*100):null;
+
+  // ══ แท็บ 3: เทียบแผน (ปริมาณ/ราคา/ขนาด) ══
+  // ปริมาณ: ใช้ PLAN_MONTH (เฉลี่ยตามจำนวนวันในช่วง) ถ้ามี — ไม่งั้น fallback PLAN_DAILY
+  const _pmVol=_planMonthVol(fr,to,ty,sp);
+  let totPlanVol, planVolSrc;
+  if(_pmVol!=null && _pmVol>0){ totPlanVol=_pmVol; planVolSrc='PLAN_MONTH'; }
+  else { totPlanVol=planF.reduce((s,r)=>s+(+r[2]||0),0); planVolSrc='PLAN_DAILY'; }
+  const hasPlanVol=totPlanVol>0;
+  const volPct=hasPlanVol?totVol/totPlanVol*100:0;
+  let pPlanW=0,pPlanWP=0; planF.forEach(r=>{const w=+r[2]||0,p=+r[5]||0; if(w>0&&p>0){pPlanW+=w;pPlanWP+=w*p;}});
+  const planPrice=pPlanW?pPlanWP/pPlanW:0;
+  let szPlanW=0,szPlanWS=0; planF.forEach(r=>{const w=+r[2]||0,s=+r[3]||0; if(w>0&&s>0){szPlanW+=w;szPlanWS+=w*s;}});
+  const planSize=szPlanW?szPlanWS/szPlanW:0;
+  const hasPlanPrice=planPrice>0&&blended>0, hasPlanSize=planSize>0&&actSize>0;
+  const pricePct=hasPlanPrice?blended/planPrice*100:0;
+  const sizeDev=hasPlanSize?Math.abs(actSize-planSize)/planSize*100:0;
+
+  // ══ แท็บ 4–5: ราคาจริง vs ราคาคาดการณ์ — แยก กุ้งเป็น(มีชีวิต) / กุ้งสด(broker) ══
+  // ราคาคาดการณ์: คอลัมน์ "มีชีวิต" = ราคากุ้งเป็น | คอลัมน์ "สด" = ราคากุ้ง Broker (ฐานคำนวณราคา)
+  const _grpPrice=rows=>{
+    let aw=0,av=0,fw=0,fv=0,vol=0;
+    rows.forEach(r=>{ const w=r.weight||0; if(w<=0) return; vol+=w;
+      if(r.price>0){aw+=w;av+=w*r.price;}
+      if(r.size>0&&typeof _getForecastPrice==='function'){ const fc=_getForecastPrice(r.size,r.species,r.typeRM,(r.date||'').slice(0,7)); if(fc&&fc.price){fw+=w;fv+=w*fc.price;} } });
+    return {vol, act:aw?av/aw:0, fc:fw?fv/fw:0};
+  };
+  const _isLiveRow=r=>(r.typeRM||'').includes('เป็น');   // กุ้งจับเป็น/เป็นต้ม/เป็นดิบ = กุ้งเป็น
+  const liveG =_grpPrice(actF.filter(_isLiveRow));        // กุ้งเป็น → ราคาคาดการณ์ "มีชีวิต"
+  const freshG=_grpPrice(actF.filter(r=>!_isLiveRow(r))); // กุ้งสด(Broker) → ราคาคาดการณ์ "สด"
+  const allG  =_grpPrice(actF);
+  const fcPrice=allG.fc;
+  const hasFc=fcPrice>0&&blended>0;
+  const fcDiff=blended-fcPrice;                 // ลบ = ซื้อถูกกว่าคาดการณ์ (ดี)
+  const fcPct=hasFc?blended/fcPrice*100:0;
+  // สถานะเทียบคาดการณ์ (ใช้ร่วมกันทั้งภาพรวมและแยกกลุ่ม)
+  const _stFc=(act,fc)=>{
+    if(!(fc>0&&act>0)) return {l:'— ไม่มีคาดการณ์',c:'kb-amber',conform:0,has:false};
+    const pct=act/fc*100;
+    if(act<=fc)      return {l:'✓ ต่ำกว่าคาดการณ์',c:'kb-green',conform:100,has:true};
+    if(act<=fc*1.03) return {l:'~ ใกล้เคียงคาดการณ์',c:'kb-amber',conform:Math.max(0,100-(pct-100)),has:true};
+    return {l:'✗ สูงกว่าคาดการณ์',c:'kb-red',conform:Math.max(0,100-(pct-100)),has:true};
+  };
+  const stFcLive =_stFc(liveG.act, liveG.fc);
+  const stFcFresh=_stFc(freshG.act,freshG.fc);
+
+  // ══ สถานะแต่ละมิติ ══
+  let stVol;
+  if(!hasPlanVol)               stVol={l:'— ไม่มีแผน',c:'kb-amber'};
+  else if(volPct>=95&&volPct<=110) stVol={l:'✓ ตรงตามแผน',c:'kb-green'};
+  else if(volPct>110)           stVol={l:'▲ สูงกว่าแผน',c:'kb-amber'};
+  else if(volPct>=80)           stVol={l:'~ ใกล้เคียงแผน',c:'kb-amber'};
+  else                          stVol={l:'✗ ต่ำกว่าแผน',c:'kb-red'};
+
+  let stPrice, priceConform;
+  if(!hasPlanPrice)                {stPrice={l:'— ไม่มีแผนราคา',c:'kb-amber'}; priceConform=0;}
+  else if(blended<=planPrice)      {stPrice={l:'✓ ดีกว่า/ตามแผน',c:'kb-green'}; priceConform=100;}
+  else if(blended<=planPrice*1.05) {stPrice={l:'~ ใกล้เคียงแผน',c:'kb-amber'};  priceConform=Math.max(0,100-(pricePct-100));}
+  else                             {stPrice={l:'✗ สูงกว่าแผน',c:'kb-red'};      priceConform=Math.max(0,100-(pricePct-100));}
+
+  let stSize, sizeConform;
+  if(!hasPlanSize)     {stSize={l:'— ไม่มีแผนขนาด',c:'kb-amber'}; sizeConform=0;}
+  else {sizeConform=Math.max(0,100-sizeDev);
+    if(sizeDev<=5)       stSize={l:'✓ ตรงตามแผน',c:'kb-green'};
+    else if(sizeDev<=15) stSize={l:'~ ใกล้เคียงแผน',c:'kb-amber'};
+    else                 stSize={l:'✗ เบี่ยงเบนจากแผน',c:'kb-red'};}
+
+  const stFc=_stFc(blended,fcPrice);   // ภาพรวม (สำหรับการ์ด)
+
+  // ══ KPI cards ══
+  _s('an-vol', _fK(totVol)+' กก.');
+  _s('an-vol-sub', f0(nRec)+' รายการ • '+nSup+' ผู้ขาย'+(volDeltaPct!=null?' • '+(volDeltaPct>=0?'▲ +':'▼ ')+Math.abs(volDeltaPct).toFixed(1)+'% vs ช่วงก่อน':''));
+  _s('an-price', '฿ '+blended.toFixed(2));
+  _s('an-price-sub', 'มูลค่ารวม '+_fM(totVal)+' ฿');
+  _s('an-kpi', hasPlanVol?volPct.toFixed(0)+'%':'—');
+  _s('an-kpi-sub', stVol.l);
+  _s('an-fc', hasFc?(fcDiff>=0?'+':'−')+'฿'+Math.abs(fcDiff).toFixed(1):'—');
+  _s('an-fc-sub', stFc.l);
+
+  // ══ ตารางสรุปรวมจาก 5 แท็บ ══
+  const _pc=v=>(v>=0?'+':'')+v.toLocaleString(undefined,{maximumFractionDigits:0});
+  const _num=(v,d)=>v.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+  // dir: 'high'=มากดี, 'low'=น้อยดี, null=กลาง
+  const rows=[
+    {m:'ปริมาณรับซื้อ',  u:'กก.',    ref:planVolSrc,   target:hasPlanVol?totPlanVol:null, act:totVol, d:0, st:stVol, dir:'high'},
+    {m:'มูลค่าซื้อ',     u:'฿',      ref:'สรุปซื้อ (t1)', target:null,                      act:totVal, d:0, st:null,  dir:null},
+    {m:'ราคาถัวเฉลี่ย',  u:'฿/กก.',  ref:'สรุปซื้อ (t1)', target:hasPlanPrice?planPrice:null,act:blended,d:2, st:stPrice,dir:'low'},
+    {m:'ราคากุ้งเป็น vs คาดการณ์ (มีชีวิต)', u:'฿/กก.', ref:'เทียบราคา (t5)', target:stFcLive.has?liveG.fc:null,  act:liveG.act,  d:2, st:liveG.vol>0?stFcLive:null,  dir:'low', skip:liveG.vol<=0},
+    {m:'ราคากุ้งสด vs คาดการณ์ (Broker)',    u:'฿/กก.', ref:'เทียบราคา (t5)', target:stFcFresh.has?freshG.fc:null,act:freshG.act, d:2, st:freshG.vol>0?stFcFresh:null,dir:'low', skip:freshG.vol<=0},
+    {m:'ขนาดเฉลี่ย',     u:'ตัว/กก.',ref:'สรุปซื้อ (t1)', target:hasPlanSize?planSize:null, act:actSize,d:1, st:stSize, dir:null}
+  ].filter(r=>!r.skip);
+  document.getElementById('anBody').innerHTML=rows.map(r=>{
+    const hasT=r.target!=null;
+    const diff=hasT?r.act-r.target:null;
+    let dc='var(--muted)';
+    if(hasT&&r.dir==='high') dc=diff>=0?'var(--green)':'var(--red)';
+    else if(hasT&&r.dir==='low') dc=diff<=0?'var(--green)':'var(--red)';
+    return '<tr>'+
+      '<td style="font-weight:600">'+r.m+' <span style="color:var(--muted);font-weight:400">('+r.u+')<\/span><\/td>'+
+      '<td style="color:var(--muted)">'+r.ref+'<\/td>'+
+      '<td style="text-align:right">'+(hasT?_num(r.target,r.d):'—')+'<\/td>'+
+      '<td style="text-align:right;font-weight:600">'+_num(r.act,r.d)+'<\/td>'+
+      '<td style="text-align:right;color:'+dc+'">'+(hasT?_pc(diff):'—')+'<\/td>'+
+      '<td>'+(r.st?'<span class="kpi-badge '+r.st.c+'">'+r.st.l+'<\/span>':'—')+'<\/td>'+
+    '<\/tr>';
+  }).join('');
+
+  // ══ กราฟความสอดคล้อง (แนวนอน) ══
+  const cLabels=['ปริมาณ (แผน)','ราคา (แผน)','ขนาด (แผน)'];
+  const conform=[hasPlanVol?Math.min(volPct,200):0, priceConform, sizeConform];
+  if(liveG.vol>0){cLabels.push('ราคากุ้งเป็น (คาดการณ์)');conform.push(stFcLive.conform);}
+  if(freshG.vol>0){cLabels.push('ราคากุ้งสด (คาดการณ์)');conform.push(stFcFresh.conform);}
+  const cc=conform.map(v=>v>=95?'rgba(0,200,151,.75)':v>=80?'rgba(255,184,0,.75)':'rgba(255,71,87,.75)');
+  _rb('cAnConform','anConform',{type:'bar',
+    data:{labels:cLabels,datasets:[{data:conform,backgroundColor:cc,borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x.toFixed(1)+'% เทียบเป้า'}}},
+      scales:{x:{suggestedMax:120,grid:{color:'rgba(0,0,0,.08)'},ticks:{callback:v=>v+'%',color:'#7A8CA3',font:{size:9}}},
+              y:{grid:{display:false},ticks:{color:'#4A5568',font:{size:10,weight:'600'}}}}}});
+
+  // ══ บทวิเคราะห์ (สังเคราะห์จากแท็บ 1–5) ══
+  document.getElementById('an-period').textContent=
+    'ช่วง '+(fr||'เริ่มต้น')+' – '+(to||'ล่าสุด')+' | ประเภท: '+(ty==='all'?'ทั้งหมด':ty)+' | ชนิด: '+(sp==='all'?'ทั้งหมด':sp)
+    +' — สังเคราะห์จากแท็บ 1 (สรุปซื้อ) · 3 (KPI เทียบแผน) · 4–5 (ราคาคาดการณ์)';
+  let html='';
+  // แท็บ 1–2
+  html+='<p><b>📦 ภาพรวมการรับซื้อ (แท็บ 1–2):</b> ในช่วงที่เลือกรับซื้อรวม <b>'+f0(totVol)+' กก.</b> '
+      +'จำนวน <b>'+f0(nRec)+'</b> รายการ จากผู้ขาย <b>'+nSup+'</b> ราย มูลค่า <b>฿'+f0(totVal)+'</b> '
+      +'ราคาถัวเฉลี่ย <b>฿'+blended.toFixed(2)+'/กก.</b> แบ่งเป็นกุ้งเป็น '+livePct.toFixed(0)+'% / กุ้งดอง '+dongPct.toFixed(0)+'%'
+      +(volDeltaPct!=null?' — ปริมาณ'+(volDeltaPct>=0?'<b style="color:var(--green)">เพิ่มขึ้น ':'<b style="color:var(--red)">ลดลง ')+Math.abs(volDeltaPct).toFixed(1)+'%</b> เทียบช่วงก่อนหน้า':'')+'.</p>';
+  // แท็บ 3
+  html+='<p><b>🎯 ผลเทียบแผน KPI (แท็บ 3):</b> '+(hasPlanVol
+      ? 'ปริมาณรับซื้อคิดเป็น <b>'+volPct.toFixed(1)+'%</b> ของแผน ('+f0(totPlanVol)+' กก. · ที่มา '+planVolSrc+(planVolSrc==='PLAN_MONTH'?' เฉลี่ยตามจำนวนวัน':'')+') — <b style="color:'+_stc(stVol)+'">'+stVol.l+'</b> '
+        +(totVol>=totPlanVol?'สูงกว่าแผน '+f0(totVol-totPlanVol)+' กก.':'ยังขาดอีก '+f0(totPlanVol-totVol)+' กก.')
+      : 'ไม่มีข้อมูลแผนปริมาณ (PLAN_MONTH/PLAN_DAILY) ในช่วงเวลาที่เลือก จึงเทียบ KPI ไม่ได้')+'.</p>';
+  // แท็บ 4–5 (แยกกุ้งเป็น/มีชีวิต กับ กุ้งสด/Broker ตามฐานราคาคาดการณ์)
+  const _fcLine=(name,g,st)=>{
+    if(!(g.vol>0)) return '';
+    if(!st.has) return '<b>'+name+':</b> ฿'+g.act.toFixed(2)+'/กก. (ไม่มีราคาคาดการณ์เทียบ)';
+    const diff=g.act-g.fc;
+    return '<b>'+name+':</b> จริง ฿'+g.act.toFixed(2)+' เทียบคาดการณ์ ฿'+g.fc.toFixed(2)+'/กก. — '
+      +(diff<=0?'<b style="color:var(--green)">ต่ำกว่าคาดการณ์ ฿'+Math.abs(diff).toFixed(2)+'</b> (คุ้มค่า)'
+               :'<b style="color:var(--red)">สูงกว่าคาดการณ์ ฿'+diff.toFixed(2)+'</b> ('+(g.act/g.fc*100-100).toFixed(1)+'%)');
+  };
+  const fcLines=[_fcLine('กุ้งเป็น (ฐานราคามีชีวิต)',liveG,stFcLive),_fcLine('กุ้งสด/Broker (ฐานราคาสด)',freshG,stFcFresh)].filter(Boolean);
+  html+='<p><b>💲 ราคาเทียบคาดการณ์ (แท็บ 4–5):</b> '
+      +(fcLines.length?'<br>&nbsp;&nbsp;• '+fcLines.join('<br>&nbsp;&nbsp;• '):'ไม่มีราคาคาดการณ์เทียบได้ในช่วงนี้')
+      +(hasPlanPrice?'<br>เทียบราคาตามแผนรวม ฿'+planPrice.toFixed(2)+'/กก. ('+(blended<=planPrice?'ตามแผน':'สูงกว่าแผน '+(pricePct-100).toFixed(1)+'%')+')':'')+'.</p>';
+  // ขนาด
+  html+='<p><b>📏 ขนาดเฉลี่ย:</b> '+(hasPlanSize
+      ? 'รับเข้าจริง <b>'+actSize.toFixed(1)+' ตัว/กก.</b> เทียบแผน <b>'+planSize.toFixed(1)+' ตัว/กก.</b> เบี่ยงเบน <b>'+sizeDev.toFixed(1)+'%</b> — '+stSize.l
+        +(actSize>planSize?' (กุ้งเล็กกว่าแผน ควรเน้นจัดหากุ้งตัวใหญ่)':actSize<planSize?' (กุ้งใหญ่กว่าแผน มูลค่าต่อหน่วยสูงขึ้น)':'')
+      : 'ขนาดเฉลี่ยจริง <b>'+actSize.toFixed(1)+' ตัว/กก.</b> (ไม่มีแผนขนาดเทียบในช่วงนี้)')+'.</p>';
+  // ข้อเสนอแนะ
+  const recs=[];
+  if(hasPlanVol && volPct<95) recs.push('เร่งจัดหาวัตถุดิบเพิ่มให้ทันเป้าหมายปริมาณที่วางไว้');
+  if(hasPlanPrice && blended>planPrice) recs.push('ทบทวนแหล่งรับซื้อ/ต่อรองราคา เพื่อดึงราคาเฉลี่ยกลับเข้ากรอบแผน');
+  if(stFcLive.has && liveG.act>liveG.fc) recs.push('ราคากุ้งเป็นสูงกว่าราคาคาดการณ์ (ฐานมีชีวิต) — พิจารณาจังหวะ/แหล่งซื้อกุ้งจับเป็น');
+  if(stFcFresh.has && freshG.act>freshG.fc) recs.push('ราคากุ้งสด/Broker สูงกว่าราคาคาดการณ์ (ฐานสด) — ทบทวนการต่อรองกับ Broker');
+  if(hasPlanSize && sizeDev>15) recs.push('ปรับเกณฑ์คัดขนาดให้สอดคล้องกับแผน เพื่อคุมคุณภาพและมูลค่าผลผลิต');
+  if(!recs.length) recs.push('ผลการดำเนินงานสอดคล้องกับแผน/คาดการณ์ในภาพรวม — รักษามาตรฐานนี้ต่อไป');
+  html+='<p style="margin-top:6px;padding-top:10px;border-top:1px solid var(--border)"><b>🎯 ข้อเสนอแนะ:</b><br>• '+recs.join('<br>• ')+'</p>';
+  document.getElementById('anText').innerHTML=html;
+}
+
 function switchTab(id,btn){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -1954,6 +2267,7 @@ function switchTab(id,btn){
     Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}});
     if(id==='t4') _renderTab4();
     if(id==='t5') _renderTab5();
+    if(id==='t6') _renderTab6();
   },50);
 }
 
