@@ -587,9 +587,11 @@ const CFG1 = {
 const CFG2 = {
   /* แหล่งข้อมูลกลางขององค์กร: Procurement_Master_File.xlsx บนไซต์ทีม KSTRMUPDATEV2
      (Shared Documents) — ทุกคนในองค์กรเห็นไฟล์ชุดเดียวกัน ไม่ใช่สำเนาส่วนตัวใน OneDrive
-     ไม่ตั้ง fileId/filePath เพื่อให้ resolve ผ่าน sharingToken ของลิงก์ไซต์โดยตรง */
+     นำเข้าไฟล์จริง: ตั้ง fileId (Drive Item ID) ตรง ๆ เพื่อให้ fetchSheet ใช้
+     Strategy 1 (/drives/{driveId}/items/{fileId}/workbook/...) อ่านข้อมูลจริง
+     โดยไม่ต้องพึ่ง sharingToken (ยังเก็บ sharingToken ไว้เป็น fallback) */
   driveId:'b!lX_zl58G_k6DwnEPguVwHM10X7IW0HFMlBjzB8qFuLdViPsKo8b5QKIzXAXu_i2b',
-  fileId: '',
+  fileId: '015324WXPDOOQEKDGMYNCJEIE64EYHHBDD',
   sharingToken: 'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   tokenPrice:   'u!aHR0cHM6Ly9rc3RoYXR5YWkzNjUuc2hhcmVwb2ludC5jb20vOng6L3MvS1NUUk1VUERBVEVWMi9JUURqYzZCRkRNekRSSklnbnVFd2M0UmpBUnVYR3BUamFGSDBUUi1hVEdLNi1xZz9lPW1nNG1Zbw',
   sheetPlan:    'PLAN_DAILY',
