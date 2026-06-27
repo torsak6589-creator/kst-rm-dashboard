@@ -1,4 +1,7 @@
-const CACHE_NAME = 'kst-rm-v17';
+/* ⚠️ เพิ่มเลขเวอร์ชันทุกครั้งที่แก้โค้ด เพื่อให้ Service Worker ล้าง cache เก่าทิ้ง
+   แล้วโหลดไฟล์ใหม่ (กันปัญหาเบราว์เซอร์ค้างโค้ดเก่าจาก cache) */
+const CACHE_VERSION = 'v18';
+const CACHE_NAME = 'kst-rm-' + CACHE_VERSION;
 const STATIC_ASSETS = [
   './kst_rm_v17.html',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
@@ -17,7 +20,7 @@ self.addEventListener('activate', e => {
     caches.keys()
       .then(keys => Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => {
-          console.log('[KST SW v17] Deleting old cache:', k);
+          console.log('[KST SW ' + CACHE_VERSION + '] Deleting old cache:', k);
           return caches.delete(k);
         })
       ))
