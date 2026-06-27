@@ -693,8 +693,16 @@ function _xlsxToRows(buffer, sheetName){
   /* ไม่ใช้ cellDates — อ่าน Excel serial ตรงๆ แล้วคำนวณวันแบบ UTC ล้วน
      กันบั๊ก timezone (UTC+7 ทำให้วันเลื่อน -1) */
   const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-  const ws = wb.Sheets[sheetName] || wb.Sheets[wb.SheetNames[0]];
-  if (!ws) throw new Error('sheet "' + sheetName + '" not found');
+  let ws = wb.Sheets[sheetName];
+  if (!ws) {
+    /* จับคู่ชื่อชีตแบบไม่สนช่องว่างซ้ำ/หัวท้าย (กันชื่อพิมพ์เว้นวรรคเกิน เช่น 'ราคา  RM คิดขาย')
+       เดิมถ้าไม่เจอจะ fallback ไปใช้ชีตแรกแบบเงียบ ๆ → อ่านชีตผิด → parse ไม่ได้ → ตกไป snapshot */
+    const norm = s => String(s).replace(/\s+/g, ' ').trim();
+    const want = norm(sheetName);
+    const hit = wb.SheetNames.find(n => norm(n) === want);
+    if (hit) ws = wb.Sheets[hit];
+  }
+  if (!ws) throw new Error('sheet "' + sheetName + '" not found (มีชีต: ' + wb.SheetNames.join(', ') + ')');
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
 
   function serialToYMD(n){
@@ -1028,20 +1036,27 @@ async function loadAll(){
           'กรกฎาคม':'กรกฎาคม','สิงหาคม':'สิงหาคม','กันยายน':'กันยายน',
           'ตุลาคม':'ตุลาคม','พฤศจิกายน':'พฤศจิกายน','ธันวาคม':'ธันวาคม'
         };
+        /* ปี/เดือน/สัปดาห์ ในชีตราคามักเป็น merged cell → เขียนค่าแค่แถวแรก แถวถัดมาว่าง
+           บั๊กเดิม: if(!r[0]) + yr!==2026 ทำให้ข้ามแถวที่ช่องปีว่าง → ได้ข้อมูลไม่ครบเดือน
+           → liveMonths < snapMonths → ตกไปใช้ STATIC_PRICE ตลอด (ราคาคาดการณ์ไม่ update)
+           แก้: carry-forward ค่าปี/เดือน/สัปดาห์ล่าสุด แล้วยึด "ชื่อเดือน + ขนาด" เป็นหลัก */
+        let _curYr=0, _curMon='', _curWk='';
         for(let i=9;i<prRows.length;i++){
           const r=prRows[i];
-          if(!r||!r[0])continue;
-          // Only 2026 rows (col 0 = ปี)
-          const yr = parseFloat(r[0]);
-          if(yr !== 2026) continue;
-          const month = String(r[colMonth]||'').trim();
-          const week  = String(r[colWeek] ||'').trim();
-          const size  = String(r[colSize] ||'').trim();
-          if(!MONTHS_TH2[month]||!size) continue;
+          if(!r)continue;
+          const yRaw = parseFloat(String(r[0]||'').replace(/[^0-9.]/g,''));
+          if(yRaw>=2000) _curYr = yRaw>2500 ? yRaw-543 : yRaw;   // รองรับ พ.ศ. (2569 → 2026)
+          const mRaw = String(r[colMonth]||'').trim();
+          if(mRaw && MONTHS_TH2[mRaw]) _curMon = mRaw;
+          const wRaw = String(r[colWeek]||'').trim();
+          if(wRaw) _curWk = wRaw;
+          const size = String(r[colSize]||'').trim();
+          if(!_curMon || !size) continue;
+          if(_curYr && _curYr !== 2026) continue;   // กรองเฉพาะปี 2026 (เมื่อทราบปี)
           const sn2=v=>{try{const x=parseFloat(String(v||'').replace(/,/g,''));return x>0?Math.round(x*10)/10:0;}catch{return 0;}};
           const wf=sn2(r[colWF]), wl=sn2(r[colWL]), bf=sn2(r[colBF]), bl=sn2(r[colBL]);
           if(wf+wl+bf+bl===0) continue;
-          newPrice.push([month, week, size, wf, wl, bf, bl]);
+          newPrice.push([_curMon, _curWk, size, wf, wl, bf, bl]);
         }
         if(newPrice.length > 0){
           const liveMonths = new Set(newPrice.map(r=>r[0])).size;
