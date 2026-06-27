@@ -569,7 +569,7 @@ tr:hover td{background:rgba(200,152,42,.03)}
 </div>
 
 <script>
-console.log('%c[KST] BUILD v17.5-swcache (27/06/2026)', 'color:#C8982A;font-weight:bold');
+console.log('%c[KST] BUILD v17.6-monthdropdown (27/06/2026)', 'color:#C8982A;font-weight:bold');
 /* ══════ CONFIG ══════ */
 const CFG1 = {
   /* ใช้ SharePoint site drive แทน personal OneDrive
@@ -1764,13 +1764,13 @@ function _renderTab5(){
   const selMon = monSel ? monSel.value : 'all';
   const selSp  = spSel  ? spSel.value  : 'all';
 
-  // Populate month dropdown
-  if(monSel && monSel.options.length <= 1){
-    const months = [...new Set(data.map(r=>r[0].slice(0,7)))].sort().reverse();
-    months.forEach(m=>{
-      const o=document.createElement('option');
-      o.value=m; o.textContent=m; monSel.appendChild(o);
-    });
+  // Populate month dropdown — สร้างใหม่เมื่อรายชื่อเดือนเปลี่ยน (เช่น live เพิ่มเดือนใหม่ภายหลัง)
+  const _rcMonths = [...new Set(data.map(r=>r[0].slice(0,7)))].sort().reverse();
+  if(monSel && monSel.options.length !== _rcMonths.length + 1){
+    const cur = monSel.value;
+    monSel.innerHTML = '<option value="all">ทุกเดือน</option>' +
+      _rcMonths.map(m => '<option value="'+m+'">'+m+'</option>').join('');
+    monSel.value = [...monSel.options].some(o => o.value === cur) ? cur : 'all';
   }
 
   // Filter data
@@ -1895,14 +1895,14 @@ function _renderTab4(){
   const selMon  = monSel ? monSel.value : 'all';
   const selWeek = weekSel ? weekSel.value : 'all';
 
-  // Populate month dropdown
+  // Populate month dropdown — สร้างใหม่เมื่อรายชื่อเดือนเปลี่ยน (เช่น live เพิ่มเดือนใหม่ภายหลัง)
+  // (บั๊กเดิม: เช็ค options.length<=1 → สร้างครั้งเดียวตอน snapshot พอ live เพิ่มเดือนใหม่จึงไม่ขึ้น)
   const months = [...new Set(_pd.map(r=>r[0]))];
-  if(monSel && monSel.options.length <= 1){
-    months.forEach(m => {
-      const o = document.createElement('option');
-      o.value = m; o.textContent = m;
-      monSel.appendChild(o);
-    });
+  if(monSel && monSel.options.length !== months.length + 1){
+    const cur = monSel.value;
+    monSel.innerHTML = '<option value="all">ทุกเดือน</option>' +
+      months.map(m => '<option value="'+m+'">'+m+'</option>').join('');
+    monSel.value = [...monSel.options].some(o => o.value === cur) ? cur : 'all';
   }
 
   // Latest month+week
@@ -2383,7 +2383,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
 /* ── PWA: Register Service Worker ── */
 if ('serviceWorker' in navigator) {
   /* เวอร์ชัน cache ปัจจุบัน — ต้องตรงกับ CACHE_NAME ใน sw.js */
-  const KST_CACHE = 'kst-rm-v18';
+  const KST_CACHE = 'kst-rm-v19';
   /* เมื่อ Service Worker ตัวใหม่เข้าควบคุม (มีโค้ดใหม่) → reload หนึ่งครั้ง
      เพื่อโหลดไฟล์ล่าสุด ไม่ค้างโค้ดเก่าจาก cache */
   let _swReloaded = false;
