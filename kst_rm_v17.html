@@ -598,6 +598,24 @@ const CFG2 = {
   sheetPrice:   'ราคา  RM คิดขาย',
   sheetReceive: 'RM-RECIVE',
 };
+
+/* ══════ BACKEND API (Azure Function — app-level credentials) ══════
+   อ่านข้อมูลด้วย identity ของ "แอป" ไม่ใช่ของผู้ใช้แต่ละคน
+   → ผู้ใช้ทุกคนได้ข้อมูล "ชุดเดียวกัน" กับเจ้าของแอป
+     (แก้ปัญหา 403 / WAC token ที่ผู้ใช้รายอื่นเจอ แล้ว fallback ไป snapshot เก่า)
+   ⚠️ ใส่ URL ของ Azure Function ที่ deploy ไว้ (repo KST-RM-UPDATE-V2)
+      ถ้าเว้นว่าง ('') ระบบจะ fallback กลับไปใช้วิธีอ่านด้วยสิทธิ์ผู้ใช้ + snapshot เหมือนเดิม
+   API_CODE = function key (?code=...) — เว้นว่างได้ถ้าตั้ง function เป็น authLevel: anonymous */
+const API_BASE = 'https://kst-rm-api.azurewebsites.net/api'; /* ← ตรวจสอบ/แก้ให้ตรง Function App จริง */
+const API_CODE = ''; /* ← วาง function key ที่นี่ ถ้า function ใช้ authLevel: function */
+/* sheet name → dataset key ของ backend */
+const API_DATASET = {
+  'RM RECORD':'rm', 'SOURCE':'rm',
+  'PLAN_DAILY':'plan', 'ACTUAL_TRACKING':'actual',
+  'ราคา  RM คิดขาย':'price', 'ราคา RM คิดขาย':'price',
+  'RM-RECIVE':'receive',
+};
+
 const REDIRECT_URI = 'https://torsak6589-creator.github.io/kst-rm-dashboard/kst_rm_v17.html';
 const SCOPES = 'Files.Read.All User.Read offline_access';
 const TENANT = '1a4d139b-4e96-4d3b-8cfd-007453cc609e';
@@ -744,8 +762,34 @@ async function _fetchTimeout(url, opts, ms){
 
 async function fetchSheet(cfg, sheet){
   const enc_s = encodeURIComponent(sheet);
-  const tok   = await _getToken();
   const errors = [];
+
+  /* ── Strategy 0: Backend API (app-level creds — ทุกคนได้ข้อมูลชุดเดียวกับเจ้าของ) ──
+     เรียกก่อน _getToken() เพื่อให้ทำงานได้แม้ผู้ใช้ยังไม่ได้ login
+     คืนค่า values (array of arrays) format เดียวกับ workbook usedRange */
+  if(API_BASE && API_DATASET[sheet]){
+    try{
+      const ds  = API_DATASET[sheet];
+      const url = API_BASE.replace(/\/+$/,'') + '/GetRMData?dataset=' + encodeURIComponent(ds)
+                + (API_CODE ? ('&code=' + encodeURIComponent(API_CODE)) : '');
+      const res = await _fetchTimeout(url, {headers:{'Accept':'application/json'}}, 20000);
+      if(res.ok){
+        const j = await res.json();
+        if(j && Array.isArray(j.values) && j.values.length){
+          console.log('[KST] ✅ API '+ds+' OK:', sheet, j.values.length, 'rows');
+          return j.values;
+        }
+        errors.push('API: empty/no values');
+      } else {
+        errors.push('API: HTTP '+res.status);
+      }
+    }catch(e){
+      errors.push('API: '+e.message);
+      console.warn('[KST] API failed, fallback to per-user:', e.message);
+    }
+  }
+
+  const tok   = await _getToken();
 
   /* ── Strategy 1: Workbook API (personal OneDrive / direct) ── */
   try{
